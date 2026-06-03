@@ -14,13 +14,10 @@ export const SOURCE_CONFIGS: Record<string, SourceConfig> = {
     label: "FundWise",
     color: "#2D6A34",
     metadataColumns: [
-      { key: "financing_purpose",  label: "Purpose"       },
-      { key: "loan_amount",        label: "Loan Amount"   },
-      { key: "annual_revenue",     label: "Annual Revenue"},
-      { key: "operating_time",     label: "Time in Biz"   },
-      { key: "business_type",      label: "Biz Type"      },
-      { key: "industry",           label: "Industry"      },
-      { key: "prior_applications", label: "Prior Apps"    },
+      { key: "financing_type",     label: "Financing Type"  },
+      { key: "funding_amount",     label: "Funding Amount"  },
+      { key: "operating_time",     label: "Time in Biz"     },
+      { key: "business_structure", label: "Biz Structure"   },
     ],
   },
   "instagram-ads": {
