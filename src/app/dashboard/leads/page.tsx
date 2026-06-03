@@ -163,7 +163,7 @@ export default function LeadsPage() {
     `https://wa.me/${phone.replace(/\D/g, "")}?text=${encodeURIComponent(`Hi ${name}, thanks for your enquiry. We would love to help — are you available for a quick call?`)}`;
 
   // Standard table headers (always shown)
-  const standardCols = ["Date", "Contact", "Service", "Est. Cost", "Status", "Action"];
+  const standardCols = ["Date", "Contact", "Service", "Funding Amt.", "Status", "Action"];
   // Extra metadata column headers when a source with config is active
   const extraColLabels = metaCols.map(c => c.label);
   const allColLabels = metaCols.length > 0
@@ -523,7 +523,7 @@ export default function LeadsPage() {
 
                 {selectedLead.estimated_cost && (
                   <div className="mt-3 p-3 rounded-xl text-center" style={{ background: "rgba(37,99,235,0.1)", border: "1px solid rgba(37,99,235,0.2)" }}>
-                    <p className="text-xs mb-1" style={{ color: "var(--text-muted)" }}>Estimated Value</p>
+                    <p className="text-xs mb-1" style={{ color: "var(--text-muted)" }}>Funding Amount</p>
                     <p className="text-xl font-bold" style={{ color: "#60a5fa" }}>{selectedLead.estimated_cost}</p>
                   </div>
                 )}

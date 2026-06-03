@@ -45,7 +45,7 @@ export const SOURCE_CONFIGS: Record<string, SourceConfig> = {
       { key: "wake_duration",     label: "Wake"          },
       { key: "location",          label: "Wake Location" },
       { key: "coffin_choice",     label: "Casket"        },
-      { key: "estimated_cost",    label: "Est. Cost"     },
+      { key: "estimated_cost",    label: "Funding Amt."     },
     ],
   },
 };
