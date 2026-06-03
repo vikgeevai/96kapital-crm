@@ -5,7 +5,7 @@ import { LeadStatus } from "@/lib/mock-data";
 import { getSourceConfig, SOURCE_CONFIGS } from "@/lib/sources";
 import {
   Search, X, Phone, Mail, MapPin,
-  MessageCircle, Layers,
+  MessageCircle, Layers, Trash2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -80,6 +80,8 @@ export default function LeadsPage() {
   const [filterSource, setFilterSource] = useState<string>("all");
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchLeads = useCallback(async () => {
     setLoading(true);
@@ -104,6 +106,26 @@ export default function LeadsPage() {
       body: JSON.stringify({ id, status }),
     });
     setUpdatingId(null);
+  };
+
+  const handleDelete = async (ids: string[]) => {
+    const msg = ids.length === 1
+      ? "Delete this lead? This cannot be undone."
+      : `Delete ${ids.length} leads? This cannot be undone.`;
+    if (!confirm(msg)) return;
+    setIsDeleting(true);
+    try {
+      await fetch(`${CRM_URL}/api/leads`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json", "x-api-key": API_KEY },
+        body: JSON.stringify({ ids }),
+      });
+      setLeads(prev => prev.filter(l => !ids.includes(l.id)));
+      setSelectedIds(new Set());
+      if (selectedLead && ids.includes(selectedLead.id)) setSelectedLead(null);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   // Unique sources present in the data, sorted by lead count descending
@@ -229,6 +251,30 @@ export default function LeadsPage() {
         </div>
       </div>
 
+      {/* ── Bulk action bar ── */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 px-4 py-2.5 mb-3 rounded-xl"
+          style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)" }}>
+          <span className="text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
+            {selectedIds.size} lead{selectedIds.size > 1 ? "s" : ""} selected
+          </span>
+          <button
+            onClick={() => handleDelete([...selectedIds])}
+            disabled={isDeleting}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-opacity"
+            style={{ background: "#ef4444", opacity: isDeleting ? 0.6 : 1, cursor: isDeleting ? "not-allowed" : "pointer" }}>
+            <Trash2 size={12} />
+            {isDeleting ? "Deleting…" : `Delete ${selectedIds.size}`}
+          </button>
+          <button
+            onClick={() => setSelectedIds(new Set())}
+            className="text-xs font-medium transition-colors"
+            style={{ color: "var(--text-muted)" }}>
+            Cancel
+          </button>
+        </div>
+      )}
+
       {/* ── Table + Drawer ── */}
       <div className="flex gap-4 h-[calc(100vh-300px)] sm:h-[calc(100vh-260px)]">
         {/* Table */}
@@ -238,6 +284,22 @@ export default function LeadsPage() {
             <table className="w-full min-w-[600px]">
               <thead className="sticky top-0 z-10" style={{ background: "var(--bg-elevated)" }}>
                 <tr style={{ borderBottom: "1px solid var(--border)" }}>
+                  {/* Checkbox select-all */}
+                  <th className="px-3 py-3" style={{ width: 36 }}>
+                    <input
+                      type="checkbox"
+                      style={{ accentColor: "var(--primary)", cursor: "pointer" }}
+                      checked={filtered.length > 0 && filtered.every(l => selectedIds.has(l.id))}
+                      ref={el => {
+                        if (el) el.indeterminate =
+                          filtered.some(l => selectedIds.has(l.id)) &&
+                          !filtered.every(l => selectedIds.has(l.id));
+                      }}
+                      onChange={e => setSelectedIds(
+                        e.target.checked ? new Set(filtered.map(l => l.id)) : new Set()
+                      )}
+                    />
+                  </th>
                   {allColLabels.map(h => (
                     <th key={h} className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap"
                       style={{ color: "var(--text-muted)" }}>{h}</th>
@@ -246,14 +308,14 @@ export default function LeadsPage() {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={allColLabels.length} className="text-center py-16" style={{ color: "var(--text-muted)" }}>
+                  <tr><td colSpan={allColLabels.length + 1} className="text-center py-16" style={{ color: "var(--text-muted)" }}>
                     <div className="flex flex-col items-center gap-2">
                       <div className="w-6 h-6 border-2 rounded-full animate-spin" style={{ borderColor: "var(--primary)", borderTopColor: "transparent" }} />
                       <p className="text-sm">Loading leads…</p>
                     </div>
                   </td></tr>
                 ) : filtered.length === 0 ? (
-                  <tr><td colSpan={allColLabels.length} className="text-center py-16" style={{ color: "var(--text-muted)" }}>
+                  <tr><td colSpan={allColLabels.length + 1} className="text-center py-16" style={{ color: "var(--text-muted)" }}>
                     <Search size={28} style={{ opacity: 0.3, margin: "0 auto 8px" }} />
                     <p className="text-sm">No leads found</p>
                   </td></tr>
@@ -268,6 +330,20 @@ export default function LeadsPage() {
                     onMouseEnter={e => { if (selectedLead?.id !== lead.id) (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.02)"; }}
                     onMouseLeave={e => { if (selectedLead?.id !== lead.id) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
                   >
+                    {/* Checkbox */}
+                    <td className="px-3 py-3.5" onClick={e => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        style={{ accentColor: "var(--primary)", cursor: "pointer" }}
+                        checked={selectedIds.has(lead.id)}
+                        onChange={() => setSelectedIds(prev => {
+                          const next = new Set(prev);
+                          next.has(lead.id) ? next.delete(lead.id) : next.add(lead.id);
+                          return next;
+                        })}
+                      />
+                    </td>
+
                     {/* Date */}
                     <td className="px-4 py-3.5">
                       <div className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
@@ -320,15 +396,26 @@ export default function LeadsPage() {
 
                     {/* Action */}
                     <td className="px-4 py-3.5">
-                      {lead.phone ? (
-                        <a href={waLink(lead.phone, lead.name)} target="_blank" rel="noopener noreferrer"
-                          onClick={e => e.stopPropagation()}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-colors"
-                          style={{ background: "#16a34a" }}>
-                          <MessageCircle size={12} />
-                          WhatsApp
-                        </a>
-                      ) : <span style={{ color: "var(--text-muted)" }}>—</span>}
+                      <div className="flex items-center gap-2">
+                        {lead.phone ? (
+                          <a href={waLink(lead.phone, lead.name)} target="_blank" rel="noopener noreferrer"
+                            onClick={e => e.stopPropagation()}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-colors"
+                            style={{ background: "#16a34a" }}>
+                            <MessageCircle size={12} />
+                            WhatsApp
+                          </a>
+                        ) : null}
+                        <button
+                          onClick={e => { e.stopPropagation(); handleDelete([lead.id]); }}
+                          title="Delete lead"
+                          className="w-7 h-7 flex items-center justify-center rounded-lg transition-colors"
+                          style={{ color: "var(--text-muted)" }}
+                          onMouseEnter={e => (e.currentTarget.style.color = "#f87171")}
+                          onMouseLeave={e => (e.currentTarget.style.color = "var(--text-muted)")}>
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

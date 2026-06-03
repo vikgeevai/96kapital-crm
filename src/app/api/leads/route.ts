@@ -57,7 +57,7 @@ function corsHeaders(origin: string | null) {
   const allowed = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
   return {
     "Access-Control-Allow-Origin": allowed,
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, x-api-key",
   };
 }
@@ -252,6 +252,37 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ success: true }, { headers });
   } catch (err) {
     console.error("[/api/leads PATCH]", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500, headers });
+  }
+}
+
+// ── DELETE — remove one or many leads ────────────────────────────────────
+export async function DELETE(req: NextRequest) {
+  const origin = req.headers.get("origin");
+  const headers = corsHeaders(origin);
+
+  if (!validateApiKey(req)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers });
+  }
+
+  let body: { ids: string[] };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400, headers });
+  }
+
+  const ids = (body.ids ?? []).map(Number).filter(n => !isNaN(n) && n > 0);
+  if (!ids.length) {
+    return NextResponse.json({ error: "ids array required" }, { status: 422, headers });
+  }
+
+  try {
+    await initDb();
+    await sql`DELETE FROM leads WHERE id = ANY(${ids}::int[])`;
+    return NextResponse.json({ success: true, deleted: ids.length }, { headers });
+  } catch (err) {
+    console.error("[/api/leads DELETE]", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500, headers });
   }
 }
