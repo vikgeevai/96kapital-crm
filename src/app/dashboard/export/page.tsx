@@ -18,7 +18,7 @@ const ALL_FIELDS = [
   { key: "estimated_cost", label: "Estimated Value" },
   { key: "location",       label: "Location" },
   { key: "notes",          label: "Notes" },
-  { key: "created_at",     label: "Submitted At" },
+  { key: "date",            label: "Date" },
 ];
 
 function toCSV(leads: any[], fields: string[]): string {
@@ -35,7 +35,7 @@ function toCSV(leads: any[], fields: string[]): string {
 
 export default function ExportPage() {
   const [selectedFields, setSelectedFields] = useState<string[]>(
-    ["name", "phone", "email", "service", "source", "status", "estimated_cost", "created_at"]
+    ["name", "phone", "email", "service", "source", "status", "estimated_cost", "date"]
   );
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [dateFrom, setDateFrom] = useState("");
