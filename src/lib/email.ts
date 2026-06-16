@@ -3,7 +3,9 @@ import { Resend } from "resend";
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 const BUSINESS_EMAIL = process.env.BUSINESS_EMAIL ?? "hello@96kapital.com";
-const FROM_EMAIL = `96 Kapital CRM <${BUSINESS_EMAIL}>`;
+const FROM_EMAIL = process.env.RESEND_FROM
+  ? `96 Kapital CRM <${process.env.RESEND_FROM}>`
+  : 'onboarding@resend.dev';
 const LOGO_URL = process.env.LOGO_URL ?? "";
 const WHATSAPP_NUMBER = process.env.WHATSAPP_NUMBER ?? "";
 
