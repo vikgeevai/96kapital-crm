@@ -10,8 +10,10 @@ export interface SourceConfig {
 }
 
 export const SOURCE_CONFIGS: Record<string, SourceConfig> = {
+  // Key stays "fundwise" — it is the value stored on every existing lead row.
+  // The label is what the dashboard displays.
   fundwise: {
-    label: "FundWise",
+    label: "KAPVOY Advisory",
     color: "#2D6A34",
     metadataColumns: [
       { key: "financing_type",     label: "Financing Type"  },
