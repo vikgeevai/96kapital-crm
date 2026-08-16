@@ -21,8 +21,15 @@ function corsHeaders(origin: string | null) {
 }
 
 function validateApiKey(req: NextRequest): boolean {
-  const key = req.headers.get("x-api-key");
-  return key === process.env.CRM_API_KEY?.trim();
+  const key = req.headers.get("x-api-key")?.trim();
+  if (!key) return false;
+  // CRM_API_KEY_PREVIOUS lets a key rotation run without downtime: set the new
+  // key here and the old one in _PREVIOUS, update every client, then clear
+  // _PREVIOUS. Clients are the KAPVOY site and the Indian Life Memorial site.
+  const accepted = [process.env.CRM_API_KEY, process.env.CRM_API_KEY_PREVIOUS]
+    .map((k) => k?.trim())
+    .filter((k): k is string => Boolean(k));
+  return accepted.includes(key);
 }
 
 export async function OPTIONS(req: NextRequest) {
