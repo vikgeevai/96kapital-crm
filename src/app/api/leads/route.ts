@@ -167,7 +167,10 @@ export async function POST(req: NextRequest) {
           estimatedCost: estimated_cost ?? "",
           productImageUrl: selected_coffin_image,
         }) : Promise.resolve(),
-        sendBusinessLeadEmail({
+        // KAPVOY Advisory (source 'fundwise') already sends its own admin
+        // notification from its own site — this CRM's copy is a duplicate
+        // for that source only. Every other source still gets it as before.
+        source === 'fundwise' ? Promise.resolve() : sendBusinessLeadEmail({
           name, email: email ?? "", phone,
           address: address ?? undefined,
           service,
