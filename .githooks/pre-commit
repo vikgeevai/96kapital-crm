@@ -1,0 +1,25 @@
+#!/bin/sh
+# Block commits containing credential-shaped strings.
+#
+# Added after a GitHub PAT and a Resend key were found committed in
+# .claude/settings.local.json — that file records raw shell commands, so a
+# credential pasted into a curl call ends up stored verbatim. Gitignoring
+# that one file is not enough; this checks whatever is actually staged.
+#
+# Bypass for a genuine false positive:  git commit --no-verify
+
+# ERE syntax: interval quantifiers are {20,}, not \{20,\}.
+PATTERN='github_pat_[A-Za-z0-9_]{20,}|ghp_[A-Za-z0-9]{20,}|gho_[A-Za-z0-9]{20,}|ghs_[A-Za-z0-9]{20,}|re_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}'
+
+hits=$(git diff --cached --name-only --diff-filter=ACM | while read -r f; do
+  git show ":$f" 2>/dev/null | grep -qE "$PATTERN" && printf '  %s\n' "$f"
+done)
+
+if [ -n "$hits" ]; then
+  echo "pre-commit: possible credential in staged changes:"
+  echo "$hits"
+  echo
+  echo "Remove it, or re-run with --no-verify if it is a false positive."
+  exit 1
+fi
+exit 0
