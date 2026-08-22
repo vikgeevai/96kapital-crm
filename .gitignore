@@ -25,3 +25,9 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .vercel
+
+# Claude Code local settings — records raw shell commands, can capture secrets
+.claude/settings.local.json
+
+# TypeScript incremental build cache
+tsconfig.tsbuildinfo
