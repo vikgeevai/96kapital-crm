@@ -15,7 +15,18 @@ async function notifyAdminWhatsApp(data: {
   name: string; phone: string; service?: string;
   source?: string; estimated_cost?: string;
 }): Promise<void> {
-  if (!GREEN_API_URL || !GREEN_INSTANCE_ID || !GREEN_INSTANCE_TOKEN || !WA_NOTIFY_PHONES.length) return;
+  const missing = [
+    !GREEN_API_URL && "GREEN_API_URL",
+    !GREEN_INSTANCE_ID && "GREEN_API_INSTANCE_ID",
+    !GREEN_INSTANCE_TOKEN && "GREEN_API_TOKEN",
+    !WA_NOTIFY_PHONES.length && "WA_NOTIFY_PHONE_1",
+  ].filter(Boolean);
+  if (missing.length) {
+    // Previously an unexplained early return, so a misconfigured alert was
+    // indistinguishable from a working one that simply had nothing to say.
+    console.warn(`[WhatsApp notify] skipped — missing: ${missing.join(", ")}`);
+    return;
+  }
 
   const sourceLabel = data.source ? ` [${data.source.replace(/-/g, " ")}]` : "";
   const lines = [
@@ -33,10 +44,17 @@ async function notifyAdminWhatsApp(data: {
     WA_NOTIFY_PHONES.map((phone) =>
       fetch(url, {
         method: "POST",
+        signal: AbortSignal.timeout(8000),
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ chatId: `${phone}@c.us`, message: lines }),
-      }).then((r) => {
-        if (!r.ok) console.warn(`[WhatsApp notify] Failed for ${phone}: ${r.status}`);
+      }).then(async (r) => {
+        if (r.ok) {
+          // Log success too. Without it, "no log" meant either delivered or
+          // silently skipped, which is not a useful thing to know.
+          console.log(`[WhatsApp notify] sent to ${phone}`);
+        } else {
+          console.warn(`[WhatsApp notify] failed for ${phone}: ${r.status} ${(await r.text()).slice(0, 200)}`);
+        }
       }).catch((err) => console.error("[WhatsApp notify]", err))
     )
   );
@@ -183,8 +201,12 @@ export async function POST(req: NextRequest) {
       ]);
     }
 
-    // WhatsApp admin notification (non-blocking — fires and forgets)
-    notifyAdminWhatsApp({
+    // Awaited deliberately. This was fire-and-forget, which is unsafe in a
+    // serverless function: the 201 below returns immediately and the lambda
+    // can be torn down before Green API is contacted, making the alert
+    // arrive intermittently. notifyAdminWhatsApp swallows its own errors, so
+    // awaiting still cannot fail the lead write.
+    await notifyAdminWhatsApp({
       name, phone,
       service:        service        || undefined,
       source:         source         || undefined,
