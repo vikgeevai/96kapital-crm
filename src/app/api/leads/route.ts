@@ -172,11 +172,13 @@ export async function POST(req: NextRequest) {
     const lead = rows[0];
 
     // Send emails (non-blocking — don't let email failure block lead storage)
+    let customerEmailSent = false;
+    let businessEmailSent = false;
     if (process.env.RESEND_API_KEY) {
       const planDetails = [planning_type, arrangement_type, disposition_type, wake_duration]
         .filter(Boolean).join(" · ") || undefined;
 
-      await Promise.allSettled([
+      const [custRes, bizRes] = await Promise.allSettled([
         email ? sendCustomerEmail({
           name, email: email ?? "",
           service,
@@ -199,6 +201,12 @@ export async function POST(req: NextRequest) {
           productImageUrl: selected_coffin_image,
         }),
       ]);
+      // deliver() resolves false on an API rejection rather than throwing, so
+      // check the value, not just whether the promise settled.
+      customerEmailSent = custRes.status === "fulfilled" && custRes.value === true;
+      businessEmailSent = bizRes.status === "fulfilled" && bizRes.value === true;
+    } else {
+      console.warn("[email] RESEND_API_KEY not set — no emails sent for this lead");
     }
 
     // Awaited deliberately. This was fire-and-forget, which is unsafe in a
@@ -213,7 +221,10 @@ export async function POST(req: NextRequest) {
       estimated_cost: estimated_cost || undefined,
     }).catch((err) => console.error("[WhatsApp notify]", err));
 
-    return NextResponse.json({ success: true, id: lead.id }, { status: 201, headers });
+    return NextResponse.json(
+      { success: true, id: lead.id, customerEmail: customerEmailSent, businessEmail: businessEmailSent },
+      { status: 201, headers }
+    );
   } catch (err) {
     console.error("[/api/leads POST]", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500, headers });

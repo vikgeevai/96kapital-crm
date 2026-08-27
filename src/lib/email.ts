@@ -10,6 +10,40 @@ const LOGO_URL = process.env.LOGO_URL ?? "";
 const WHATSAPP_NUMBER = process.env.WHATSAPP_NUMBER ?? "";
 
 // ── Customer auto-reply ────────────────────────────────────────────────────
+/**
+ * Send via Resend and actually inspect the outcome.
+ *
+ * The Resend SDK (v6) RESOLVES with { data, error } when the API rejects a
+ * send — it does not throw. Both senders here used to `return
+ * resend.emails.send(...)` and discard that, and the caller wraps them in
+ * Promise.allSettled, which counts a resolved-with-error as fulfilled. So an
+ * invalid key, an unverified sender or a blocked recipient produced no error,
+ * no log and no email. The KAPVOY site had the identical bug and it hid a
+ * genuine outage for days: leads recorded fine while every notification
+ * silently failed.
+ */
+async function deliver(
+  label: string,
+  payload: Parameters<typeof resend.emails.send>[0]
+): Promise<boolean> {
+  try {
+    const { data, error } = await resend.emails.send(payload);
+    if (error) {
+      console.error(
+        `[email] ${label} rejected by Resend:`,
+        JSON.stringify({ from: FROM_EMAIL, to: (payload as { to?: unknown }).to, error })
+      );
+      return false;
+    }
+    console.log(`[email] ${label} sent, id: ${data?.id}`);
+    return true;
+  } catch (err) {
+    // Network/DNS level — distinct from an API rejection above.
+    console.error(`[email] ${label} threw:`, err);
+    return false;
+  }
+}
+
 export async function sendCustomerEmail(data: {
   name: string;
   email: string;
@@ -144,7 +178,7 @@ Our team will reach out within 5 minutes.${WHATSAPP_NUMBER ? ` Need help now? Wh
 
 96 Kapital CRM`;
 
-  return resend.emails.send({
+  return deliver("customer confirmation", {
     from: FROM_EMAIL,
     to: data.email,
     replyTo: BUSINESS_EMAIL,
@@ -293,7 +327,7 @@ Service Details:
 
 -- 96 Kapital CRM CRM`;
 
-  return resend.emails.send({
+  return deliver("business lead alert", {
     from: FROM_EMAIL,
     to: BUSINESS_EMAIL,
     subject: `New Lead: ${data.name} — ${data.service} (${data.estimatedCost})`,
