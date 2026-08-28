@@ -100,7 +100,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    void (async () => {
       try {
         const res = await fetch("/api/settings/integration-key", { cache: "no-store" });
         const body = await res.json().catch(() => null);
@@ -125,7 +125,7 @@ export default function SettingsPage() {
 
   const copyKey = () => {
     if (!apiKey) return;
-    navigator.clipboard.writeText(apiKey);
+    void navigator.clipboard.writeText(apiKey);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -175,7 +175,7 @@ await fetch('${endpoint}', {
 });`;
 
   const copySnippet = () => {
-    navigator.clipboard.writeText(snippetTab === "html" ? htmlSnippet : jsSnippet);
+    void navigator.clipboard.writeText(snippetTab === "html" ? htmlSnippet : jsSnippet);
     setSnippetCopied(true);
     setTimeout(() => setSnippetCopied(false), 2000);
   };

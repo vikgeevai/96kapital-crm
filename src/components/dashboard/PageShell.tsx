@@ -62,7 +62,7 @@ export function PageShell({ title, subtitle, actions, children }: PageShellProps
           <div className="flex items-center gap-2 flex-shrink-0">
             {actions}
             <button
-              onClick={handleRefresh}
+              onClick={() => void handleRefresh()}
               className="w-9 h-9 flex items-center justify-center border transition-colors duration-150"
               style={{ borderColor: "var(--border)", color: "var(--text-muted)", background: "var(--bg-elevated)" }}
               aria-label="Refresh"
@@ -81,7 +81,7 @@ export function PageShell({ title, subtitle, actions, children }: PageShellProps
               A
             </div>
             <button
-              onClick={handleLogout}
+              onClick={() => void handleLogout()}
               title="Sign out"
               className="hidden sm:flex w-9 h-9 items-center justify-center border transition-colors duration-150"
               style={{ borderColor: "var(--border)", color: "var(--text-muted)", background: "var(--bg-elevated)" }}

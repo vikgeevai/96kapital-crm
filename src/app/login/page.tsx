@@ -101,7 +101,7 @@ export default function LoginPage() {
             are waiting.
           </h2>
           <p className="text-base leading-relaxed max-w-sm" style={{ color: "var(--text-secondary)", fontWeight: 300 }}>
-            Every minute you're not in the dashboard is a minute your pipeline isn't moving.
+            Every minute you&apos;re not in the dashboard is a minute your pipeline isn&apos;t moving.
           </p>
         </div>
 
@@ -146,7 +146,7 @@ export default function LoginPage() {
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+          <form onSubmit={e => { void handleSubmit(e); }} className="space-y-5" noValidate>
             {/* Email */}
             <div>
               <label htmlFor="email" className="block text-sm font-medium mb-2 font-mono-data uppercase tracking-wider" style={{ color: "var(--text-muted)", fontSize: "11px" }}>

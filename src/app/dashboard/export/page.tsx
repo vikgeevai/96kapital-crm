@@ -199,7 +199,7 @@ export default function ExportPage() {
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              onClick={handleExport}
+              onClick={() => void handleExport()}
               disabled={exporting || selectedFields.length === 0}
               className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white transition-all"
               style={{

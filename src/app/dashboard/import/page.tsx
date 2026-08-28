@@ -24,7 +24,7 @@ const CRM_FIELDS = [
 
 /** Auto-detect which CRM field a spreadsheet column header maps to. */
 function autoDetect(header: string): string {
-  const h = header.toLowerCase().replace(/[\s_\-]/g, "");
+  const h = header.toLowerCase().replace(/[\s_-]/g, "");
   if (["fullname", "name", "firstname", "lastname", "clientname"].some(k => h.includes(k))) return "name";
   if (["phonenumber", "phone", "mobile", "whatsapp", "tel", "contact"].some(k => h.includes(k))) return "phone";
   if (["email", "emailaddress", "mail"].some(k => h.includes(k))) return "email";
@@ -59,6 +59,25 @@ interface ImportResult {
   inserted: number;
   skipped: number;
   errors: Array<{ row: number; reason: string }>;
+}
+
+/**
+ * Spreadsheet cells come back as unknown. String(cell) on an object yields the
+ * literal text "[object Object]", which would then be written into the CRM as
+ * a lead's name or phone number with nothing flagging it.
+ */
+function cellToText(cell: unknown): string {
+  if (cell === null || cell === undefined) return "";
+  // Dates are the one object type SheetJS routinely produces.
+  if (cell instanceof Date) return cell.toISOString().slice(0, 10);
+  // Allow-list rather than a fallthrough to String(): anything else is an
+  // object, and String(object) is the literal text "[object Object]", which
+  // would be written into the CRM as a lead's name or phone number.
+  if (typeof cell === "string") return cell;
+  if (typeof cell === "number" || typeof cell === "boolean" || typeof cell === "bigint") {
+    return cell.toString();
+  }
+  return "";
 }
 
 export default function ImportPage() {
@@ -114,8 +133,8 @@ export default function ImportPage() {
       const workbook = XLSX.read(buffer, { type: "array" });
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
       const data = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: "" });
-      const rows = (data as unknown[][])
-        .map(row => row.map(cell => String(cell ?? "")))
+      const rows = (data)
+        .map(row => row.map(cell => cellToText(cell)))
         .filter(row => row.some(c => c.trim()));
       const [headerRow, ...dataRows] = rows;
       processCSVData(headerRow, dataRows);
@@ -134,7 +153,7 @@ export default function ImportPage() {
     e.preventDefault();
     setDragging(false);
     const file = e.dataTransfer.files?.[0];
-    if (file) handleFile(file);
+    if (file) void handleFile(file);
   }, [handleFile]);
 
   // ── Fetch Google Sheet ────────────────────────────────────────────────
@@ -305,7 +324,7 @@ export default function ImportPage() {
                       type="file"
                       accept=".csv,.xlsx,.xls"
                       className="absolute inset-0 opacity-0 cursor-pointer"
-                      onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
+                      onChange={e => { const f = e.target.files?.[0]; if (f) void handleFile(f); }}
                     />
                   </div>
                 )}
@@ -318,7 +337,7 @@ export default function ImportPage() {
                         type="url"
                         value={sheetUrl}
                         onChange={e => { setSheetUrl(e.target.value); setSheetError(""); }}
-                        onKeyDown={e => e.key === "Enter" && handleFetchSheet()}
+                        onKeyDown={e => { if (e.key === "Enter") void handleFetchSheet(); }}
                         placeholder="https://docs.google.com/spreadsheets/d/…"
                         className="flex-1 px-4 py-3 text-sm"
                         style={INPUT_STYLE}
@@ -326,7 +345,7 @@ export default function ImportPage() {
                       <motion.button
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
-                        onClick={handleFetchSheet}
+                        onClick={() => void handleFetchSheet()}
                         disabled={fetchingSheet}
                         className="flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-50"
                         style={{ background: "var(--primary)" }}
@@ -345,7 +364,7 @@ export default function ImportPage() {
                     <div className="flex items-start gap-2 p-3 rounded-xl" style={{ background: "rgba(37,99,235,0.07)", border: "1px solid rgba(37,99,235,0.18)" }}>
                       <Info size={13} className="flex-shrink-0 mt-0.5" style={{ color: "var(--primary-light)" }} />
                       <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
-                        The sheet must be set to <strong style={{ color: "var(--text-primary)" }}>"Anyone with the link (Viewer)"</strong>.
+                        The sheet must be set to <strong style={{ color: "var(--text-primary)" }}>&quot;Anyone with the link (Viewer)&quot;</strong>.
                         In Google Sheets: <strong style={{ color: "var(--text-primary)" }}>Share → Change → Anyone with the link</strong>.
                       </p>
                     </div>
@@ -367,7 +386,7 @@ export default function ImportPage() {
                   style={INPUT_STYLE}
                 />
                 <p className="text-xs mt-2" style={{ color: "var(--text-muted)" }}>
-                  Shows up as the "Source" field on each lead card. Useful for filtering later.
+                  Shows up as the &quot;Source&quot; field on each lead card. Useful for filtering later.
                 </p>
               </div>
 
@@ -399,7 +418,7 @@ export default function ImportPage() {
               <div style={CARD_STYLE}>
                 <h3 className="text-sm font-bold mb-1" style={{ color: "var(--text-primary)" }}>Map columns to CRM fields</h3>
                 <p className="text-xs mb-4" style={{ color: "var(--text-muted)" }}>
-                  Auto-detected below — adjust any column if needed. Columns set to "— Ignore —" won't be imported.
+                  Auto-detected below — adjust any column if needed. Columns set to &quot;— Ignore —&quot; won&apos;t be imported.
                 </p>
 
                 <div className="space-y-2">
@@ -475,7 +494,7 @@ export default function ImportPage() {
                 <motion.button
                   whileHover={{ scale: readyCount === 0 ? 1 : 1.02 }}
                   whileTap={{ scale: readyCount === 0 ? 1 : 0.98 }}
-                  onClick={handleImport}
+                  onClick={() => void handleImport()}
                   disabled={readyCount === 0 || importing}
                   className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-40"
                   style={{ background: "var(--primary)", boxShadow: readyCount > 0 ? "0 0 24px rgba(37,99,235,0.3)" : "none" }}
@@ -519,7 +538,7 @@ export default function ImportPage() {
                         {result.inserted} lead{result.inserted !== 1 ? "s" : ""} imported successfully
                       </p>
                       <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-                        Tagged with source <strong style={{ color: "var(--text-primary)" }}>"{source}"</strong>
+                        Tagged with source <strong style={{ color: "var(--text-primary)" }}>&quot;{source}&quot;</strong>
                         {result.skipped > 0 && ` · ${result.skipped} row${result.skipped !== 1 ? "s" : ""} skipped`}
                       </p>
                     </div>
@@ -592,7 +611,7 @@ export default function ImportPage() {
                   <li>Upload the downloaded file above</li>
                 </ol>
                 <p className="text-xs mt-2" style={{ color: "var(--text-secondary)" }}>
-                  Or paste the sheet URL directly if it's shared as "Anyone with the link".
+                  Or paste the sheet URL directly if it&apos;s shared as &quot;Anyone with the link&quot;.
                 </p>
               </div>
             </div>

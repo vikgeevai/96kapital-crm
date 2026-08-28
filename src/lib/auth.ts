@@ -16,7 +16,7 @@ function b64url(buf: ArrayBuffer): string {
 
 function fromB64url(s: string): ArrayBuffer {
   const b64 = s.replace(/-/g, "+").replace(/_/g, "/");
-  return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)).buffer as ArrayBuffer;
+  return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)).buffer;
 }
 
 async function hmacKey(secret: string): Promise<CryptoKey> {

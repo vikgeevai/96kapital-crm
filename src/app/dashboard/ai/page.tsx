@@ -349,7 +349,7 @@ export default function AIPage() {
           <motion.button
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.97 }}
-            onClick={handleGenerateAI}
+            onClick={() => void handleGenerateAI()}
             disabled={generating || loading}
             className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
             style={{ background: "linear-gradient(135deg, #7c3aed, #4f46e5)", borderRadius: "8px" }}
@@ -365,7 +365,7 @@ export default function AIPage() {
         {!claudeInsights && !generating && !claudeError && (
           <div className="py-10 flex flex-col items-center gap-2" style={{ color: "var(--text-muted)" }}>
             <Brain size={28} style={{ opacity: 0.25 }} />
-            <p className="text-sm">Click "Generate AI Analysis" to get Claude's assessment of your pipeline.</p>
+            <p className="text-sm">Click &quot;Generate AI Analysis&quot; to get Claude&apos;s assessment of your pipeline.</p>
           </div>
         )}
 

@@ -68,7 +68,7 @@ export default function AlertsPage() {
     }
   };
 
-  useEffect(() => { fetchAlerts(); }, []);
+  useEffect(() => { void fetchAlerts(); }, []);
 
   const markContacted = async (id: string) => {
     setMarkingId(id);
@@ -128,7 +128,7 @@ export default function AlertsPage() {
               Leads Awaiting Follow-up
             </h3>
           </div>
-          <button onClick={fetchAlerts}
+          <button onClick={() => void fetchAlerts()}
             className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-colors"
             style={{ borderColor: "var(--border)", color: "var(--text-muted)", background: "var(--bg-elevated)" }}>
             <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
@@ -157,7 +157,7 @@ export default function AlertsPage() {
               This is not an all-clear — urgent leads may exist that cannot be shown.
             </p>
             <button
-              onClick={fetchAlerts}
+              onClick={() => void fetchAlerts()}
               className="mt-4 px-4 py-2 rounded-xl text-sm font-medium"
               style={{ background: "var(--bg-elevated)", border: "1px solid var(--glass-border)" }}
             >
@@ -225,7 +225,7 @@ export default function AlertsPage() {
                         style={{ background: "var(--primary)" }}>
                         <Phone size={12} /> Call
                       </a>
-                      <button onClick={() => markContacted(lead.id)}
+                      <button onClick={() => void markContacted(lead.id)}
                         disabled={markingId === lead.id}
                         className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-colors"
                         style={{ background: "rgba(16,185,129,0.15)", color: "#10b981", border: "1px solid rgba(16,185,129,0.3)" }}>

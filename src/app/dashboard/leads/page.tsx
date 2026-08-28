@@ -109,7 +109,7 @@ export default function LeadsPage() {
     }
   }, []);
 
-  useEffect(() => { fetchLeads(); }, [fetchLeads]);
+  useEffect(() => { void fetchLeads(); }, [fetchLeads]);
 
   const updateStatus = async (id: string, status: LeadStatus) => {
     setUpdatingId(id);
@@ -222,7 +222,7 @@ export default function LeadsPage() {
         >
           <span className="text-sm font-medium" style={{ color: "#ef4444" }}>{loadError}</span>
           <button
-            onClick={fetchLeads}
+            onClick={() => void fetchLeads()}
             className="ml-auto text-xs underline"
             style={{ color: "#ef4444" }}
           >
@@ -282,14 +282,14 @@ export default function LeadsPage() {
               className="text-xs font-medium px-3 py-1.5 rounded-full transition-all duration-150 flex items-center gap-1.5"
               style={{
                 background: filterStatus === s
-                  ? s === "all" ? "rgba(124,92,252,0.2)" : STATUS_CONFIG[s as LeadStatus].bg
+                  ? s === "all" ? "rgba(124,92,252,0.2)" : STATUS_CONFIG[s].bg
                   : "rgba(255,255,255,0.04)",
                 color: filterStatus === s
-                  ? s === "all" ? "var(--primary-light)" : STATUS_CONFIG[s as LeadStatus].color
+                  ? s === "all" ? "var(--primary-light)" : STATUS_CONFIG[s].color
                   : "var(--text-muted)",
                 border: filterStatus === s ? "1px solid transparent" : "1px solid rgba(255,255,255,0.06)",
               }}>
-              {s === "all" ? "All" : STATUS_CONFIG[s as LeadStatus].label}
+              {s === "all" ? "All" : STATUS_CONFIG[s].label}
               <span className="text-xs px-1 rounded-sm" style={{ background: "rgba(255,255,255,0.1)" }}>
                 {countByStatus(s)}
               </span>
@@ -317,7 +317,7 @@ export default function LeadsPage() {
             {selectedIds.size} lead{selectedIds.size > 1 ? "s" : ""} selected
           </span>
           <button
-            onClick={() => handleDelete([...selectedIds])}
+            onClick={() => void handleDelete([...selectedIds])}
             disabled={isDeleting}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-opacity"
             style={{ background: "#ef4444", opacity: isDeleting ? 0.6 : 1, cursor: isDeleting ? "not-allowed" : "pointer" }}>
@@ -396,7 +396,8 @@ export default function LeadsPage() {
                         checked={selectedIds.has(lead.id)}
                         onChange={() => setSelectedIds(prev => {
                           const next = new Set(prev);
-                          next.has(lead.id) ? next.delete(lead.id) : next.add(lead.id);
+                          if (next.has(lead.id)) next.delete(lead.id);
+                          else next.add(lead.id);
                           return next;
                         })}
                       />
@@ -465,7 +466,7 @@ export default function LeadsPage() {
                           </a>
                         ) : null}
                         <button
-                          onClick={e => { e.stopPropagation(); handleDelete([lead.id]); }}
+                          onClick={e => { e.stopPropagation(); void handleDelete([lead.id]); }}
                           title="Delete lead"
                           className="w-7 h-7 flex items-center justify-center rounded-lg transition-colors"
                           style={{ color: "var(--text-muted)" }}
@@ -553,7 +554,7 @@ export default function LeadsPage() {
                 <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--text-muted)" }}>Update Status</p>
                 <div className="grid grid-cols-3 gap-1.5">
                   {STATUS_ORDER.map(s => (
-                    <button key={s} onClick={() => updateStatus(selectedLead.id, s)}
+                    <button key={s} onClick={() => void updateStatus(selectedLead.id, s)}
                       disabled={updatingId === selectedLead.id}
                       className="py-1.5 px-2 rounded-lg text-xs font-semibold transition-all"
                       style={{

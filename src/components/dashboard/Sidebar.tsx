@@ -48,8 +48,8 @@ function SidebarContent({ collapsed, onClose }: { collapsed?: boolean; onClose?:
       }
     };
 
-    fetchCount();
-    const interval = setInterval(fetchCount, 60_000); // refresh every 60s
+    void fetchCount();
+    const interval = setInterval(() => void fetchCount(), 60_000); // refresh every 60s
     return () => clearInterval(interval);
   }, []);
 
@@ -157,7 +157,7 @@ function SidebarContent({ collapsed, onClose }: { collapsed?: boolean; onClose?:
           {!collapsed && <span>Settings</span>}
         </Link>
         <button
-          onClick={handleLogout}
+          onClick={() => void handleLogout()}
           className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium transition-all duration-150"
           style={{ color: "var(--text-secondary)" }}
           onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(239,68,68,0.07)"; (e.currentTarget as HTMLElement).style.color = "#fca5a5"; }}

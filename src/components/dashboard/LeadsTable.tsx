@@ -95,7 +95,7 @@ export function LeadsTable() {
     }
   };
 
-  useEffect(() => { fetchLeads(); }, []);
+  useEffect(() => { void fetchLeads(); }, []);
 
   const filtered = useMemo(() => {
     let data = [...leads];
@@ -117,8 +117,8 @@ export function LeadsTable() {
         va = STATUS_ORDER.indexOf(a.status).toString();
         vb = STATUS_ORDER.indexOf(b.status).toString();
       } else {
-        va = (a[sortCol] as string) ?? "";
-        vb = (b[sortCol] as string) ?? "";
+        va = (a[sortCol]) ?? "";
+        vb = (b[sortCol]) ?? "";
       }
       return sortDir === "asc" ? va.localeCompare(vb) : vb.localeCompare(va);
     });
@@ -170,7 +170,7 @@ export function LeadsTable() {
             <button
               className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm border transition-colors duration-150"
               style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
-              onClick={fetchLeads}
+              onClick={() => void fetchLeads()}
               disabled={loading}
               title="Refresh leads"
             >
@@ -198,15 +198,15 @@ export function LeadsTable() {
                 className="text-xs font-medium px-3 py-1.5 rounded-full transition-all duration-150 flex items-center gap-1.5"
                 style={{
                   background: filterStatus === s
-                    ? s === "all" ? "rgba(124,92,252,0.2)" : STATUS_CONFIG[s as LeadStatus].bg
+                    ? s === "all" ? "rgba(124,92,252,0.2)" : STATUS_CONFIG[s].bg
                     : "rgba(255,255,255,0.04)",
                   color: filterStatus === s
-                    ? s === "all" ? "var(--primary-light)" : STATUS_CONFIG[s as LeadStatus].color
+                    ? s === "all" ? "var(--primary-light)" : STATUS_CONFIG[s].color
                     : "var(--text-muted)",
                   border: filterStatus === s ? "1px solid transparent" : "1px solid rgba(255,255,255,0.06)",
                 }}
               >
-                {s === "all" ? "All" : STATUS_CONFIG[s as LeadStatus].label}
+                {s === "all" ? "All" : STATUS_CONFIG[s].label}
                 <span
                   className="text-xs px-1 rounded-sm"
                   style={{ background: "rgba(255,255,255,0.1)" }}
@@ -248,7 +248,7 @@ export function LeadsTable() {
         ) : error ? (
           <div className="py-12 flex flex-col items-center gap-3">
             <p className="text-sm text-red-400">{error}</p>
-            <button className="text-xs underline" style={{ color: "var(--primary-light)" }} onClick={fetchLeads}>Retry</button>
+            <button className="text-xs underline" style={{ color: "var(--primary-light)" }} onClick={() => void fetchLeads()}>Retry</button>
           </div>
         ) : filtered.length === 0 ? (
           <div className="py-12 flex flex-col items-center gap-3" style={{ color: "var(--text-muted)" }}>
@@ -278,7 +278,7 @@ export function LeadsTable() {
                     <div className="text-sm font-semibold truncate">{lead.name}</div>
                     <div className="text-xs truncate" style={{ color: "var(--text-muted)" }}>{lead.email}</div>
                   </div>
-                  <StatusMenu current={lead.status} onChange={(s) => updateStatus(lead.id, s)} />
+                  <StatusMenu current={lead.status} onChange={(s) => void updateStatus(lead.id, s)} />
                 </div>
                 <div className="flex flex-wrap items-center gap-2 mt-2">
                   <span
@@ -360,7 +360,7 @@ export function LeadsTable() {
                 <td colSpan={7} className="text-center py-16" style={{ color: "var(--text-muted)" }}>
                   <div className="flex flex-col items-center gap-3">
                     <p className="text-sm text-red-400">{error}</p>
-                    <button className="text-xs underline" style={{ color: "var(--primary-light)" }} onClick={fetchLeads}>
+                    <button className="text-xs underline" style={{ color: "var(--primary-light)" }} onClick={() => void fetchLeads()}>
                       Retry
                     </button>
                   </div>
@@ -434,7 +434,7 @@ export function LeadsTable() {
 
                   {/* Status */}
                   <td className="px-4 py-3.5">
-                    <StatusMenu current={lead.status} onChange={(s) => updateStatus(lead.id, s)} />
+                    <StatusMenu current={lead.status} onChange={(s) => void updateStatus(lead.id, s)} />
                   </td>
 
                   {/* Response time */}

@@ -403,7 +403,7 @@ function FeaturePreview({ type }: { type:string }) {
     <div className="bg-white rounded-lg p-3 border border-slate-100 shadow-sm" style={{ fontFamily:SANS }}>
       <div className="text-[10px] text-slate-400 mb-1.5">Pre-filled message for Alex Rivera</div>
       <div className="bg-slate-50 rounded p-2 text-[9px] text-slate-700 border border-slate-200 leading-relaxed mb-2">
-        "Hi Alex, thanks for reaching out. We received your enquiry and would love to help. Are you free for a quick call?"
+        &quot;Hi Alex, thanks for reaching out. We received your enquiry and would love to help. Are you free for a quick call?&quot;
       </div>
       <div className="flex items-center justify-center gap-1.5 text-white text-xs font-semibold py-1.5 rounded-lg" style={{ background:"#25d366" }}>
         <MessageCircle size={10} /> Send via WhatsApp
@@ -429,30 +429,45 @@ function FeaturesSection() {
           </motion.p>
         </motion.div>
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {FEATS.map((f,i) => {
-            const r2 = useRef(null);
-            const iv2 = useInView(r2, { once:true, margin:"-50px" });
-            return (
-              <motion.div key={f.label} ref={r2}
-                initial={{ opacity:0, y:24 }} animate={iv2?{opacity:1,y:0}:{}}
-                transition={{ duration:0.5, delay:i*0.07 }}
-                whileHover={{ y:-3, boxShadow:"0 16px 48px rgba(0,0,0,0.09)" }}
-                className="rounded-2xl p-5 border border-slate-100 bg-white transition-shadow duration-300">
-                <div className="flex items-center gap-2.5 mb-3">
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background:f.color+"15" }}>
-                    <f.icon size={15} style={{ color:f.color }} />
-                  </div>
-                  <span className="text-xs font-semibold uppercase tracking-wide" style={{ color:f.color, fontFamily:SANS }}>{f.label}</span>
-                </div>
-                <h3 className="text-sm font-bold text-slate-900 mb-1.5" style={{ fontFamily:SANS }}>{f.title}</h3>
-                <p className="text-xs text-slate-500 leading-relaxed mb-4" style={{ fontFamily:SANS }}>{f.desc}</p>
-                <FeaturePreview type={f.preview} />
-              </motion.div>
-            );
-          })}
+          {FEATS.map((f,i) => (
+            <FeatureCard key={f.label} f={f} i={i} />
+          ))}
         </div>
       </div>
     </section>
+  );
+}
+
+/**
+ * Extracted from the .map() callbacks these used to live in.
+ *
+ * useRef and useInView were being called inside `FEATS.map(...)` and
+ * `steps.map(...)`. That only works by accident: React identifies hooks by
+ * call order, so it holds together exactly as long as those arrays keep a
+ * constant length and order on every render. Make either one conditional or
+ * data-driven and the hook order shifts, which corrupts unrelated state
+ * rather than throwing anything obvious. A component per item is the shape
+ * that is actually correct.
+ */
+function FeatureCard({ f, i }: { f: (typeof FEATS)[number]; i: number }) {
+  const ref = useRef(null);
+  const inView = useInView(ref, { once:true, margin:"-50px" });
+  return (
+    <motion.div ref={ref}
+      initial={{ opacity:0, y:24 }} animate={inView?{opacity:1,y:0}:{}}
+      transition={{ duration:0.5, delay:i*0.07 }}
+      whileHover={{ y:-3, boxShadow:"0 16px 48px rgba(0,0,0,0.09)" }}
+      className="rounded-2xl p-5 border border-slate-100 bg-white transition-shadow duration-300">
+      <div className="flex items-center gap-2.5 mb-3">
+        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background:f.color+"15" }}>
+          <f.icon size={15} style={{ color:f.color }} />
+        </div>
+        <span className="text-xs font-semibold uppercase tracking-wide" style={{ color:f.color, fontFamily:SANS }}>{f.label}</span>
+      </div>
+      <h3 className="text-sm font-bold text-slate-900 mb-1.5" style={{ fontFamily:SANS }}>{f.title}</h3>
+      <p className="text-xs text-slate-500 leading-relaxed mb-4" style={{ fontFamily:SANS }}>{f.desc}</p>
+      <FeaturePreview type={f.preview} />
+    </motion.div>
   );
 }
 
@@ -475,7 +490,7 @@ function DashboardSection() {
         </motion.div>
         <div className="flex justify-center gap-2 mb-6">
           {([["leads","📋 Leads"],["analytics","📊 Analytics"],["alerts","🔔 Alerts"]] as const).map(([k,l]) => (
-            <button key={k} onClick={() => setTab(k as any)}
+            <button key={k} onClick={() => setTab(k)}
               className={`px-4 py-2 rounded-full text-xs font-semibold transition-all duration-200 ${tab===k?"bg-blue-600 text-white shadow-md shadow-blue-600/20":"bg-white text-slate-600 border border-slate-200 hover:border-blue-300"}`}
               style={{ fontFamily:SANS }}>
               {l}
@@ -616,11 +631,6 @@ function DashboardSection() {
 function HowItWorks() {
   const ref = useRef(null);
   const inView = useInView(ref, { once:true, margin:"-80px" });
-  const steps = [
-    { n:"01", icon:Users, color:"#2563eb", title:"Customer submits an enquiry", desc:"A prospect visits your website, fills out a contact or quote form — service interest, budget, and details — and hits submit. 96 Kapital CRM captures it instantly." },
-    { n:"02", icon:Zap, color:"#16a34a", title:"You get an instant alert", desc:"Within seconds, a WhatsApp message and email hit your phone with the full lead — name, number, service required, and estimated value. No delays." },
-    { n:"03", icon:TrendingUp, color:"#7c3aed", title:"Log in and close the deal", desc:"Open the dashboard, see your AI-scored lead list, click WhatsApp to send a personalised message, and update the status as you work it." },
-  ];
   return (
     <section id="how-it-works" ref={ref} className="py-20 bg-white">
       <div className="mx-auto max-w-6xl px-6">
@@ -634,26 +644,37 @@ function HowItWorks() {
           </motion.p>
         </motion.div>
         <div className="grid lg:grid-cols-3 gap-6">
-          {steps.map((s,i) => {
-            const r2 = useRef(null);
-            const iv2 = useInView(r2, { once:true, margin:"-50px" });
-            return (
-              <motion.div key={s.n} ref={r2}
-                initial={{ opacity:0, y:24 }} animate={iv2?{opacity:1,y:0}:{}}
-                transition={{ duration:0.55, delay:i*0.12 }}
-                className="relative rounded-2xl p-6 border border-slate-100 bg-slate-50 hover:bg-white transition-colors duration-200">
-                <div className="text-[11px] font-bold tracking-widest mb-4 font-mono" style={{ color:s.color }}>{s.n}</div>
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4 border" style={{ background:s.color+"10", borderColor:s.color+"20" }}>
-                  <s.icon size={18} style={{ color:s.color }} />
-                </div>
-                <h3 className="text-base font-bold text-slate-900 mb-2" style={{ fontFamily:SANS }}>{s.title}</h3>
-                <p className="text-xs text-slate-500 leading-relaxed" style={{ fontFamily:SANS }}>{s.desc}</p>
-              </motion.div>
-            );
-          })}
+          {STEPS.map((s,i) => (
+            <StepCard key={s.n} s={s} i={i} />
+          ))}
         </div>
       </div>
     </section>
+  );
+}
+
+const STEPS = [
+  { n:"01", icon:Users, color:"#2563eb", title:"Customer submits an enquiry", desc:"A prospect visits your website, fills out a contact or quote form — service interest, budget, and details — and hits submit. 96 Kapital CRM captures it instantly." },
+  { n:"02", icon:Zap, color:"#16a34a", title:"You get an instant alert", desc:"Within seconds, a WhatsApp message and email hit your phone with the full lead — name, number, service required, and estimated value. No delays." },
+  { n:"03", icon:TrendingUp, color:"#7c3aed", title:"Log in and close the deal", desc:"Open the dashboard, see your AI-scored lead list, click WhatsApp to send a personalised message, and update the status as you work it." },
+];
+
+/** Sibling of FeatureCard — see the note there for why these are components. */
+function StepCard({ s, i }: { s: (typeof STEPS)[number]; i: number }) {
+  const ref = useRef(null);
+  const inView = useInView(ref, { once:true, margin:"-50px" });
+  return (
+    <motion.div ref={ref}
+      initial={{ opacity:0, y:24 }} animate={inView?{opacity:1,y:0}:{}}
+      transition={{ duration:0.55, delay:i*0.12 }}
+      className="relative rounded-2xl p-6 border border-slate-100 bg-slate-50 hover:bg-white transition-colors duration-200">
+      <div className="text-[11px] font-bold tracking-widest mb-4 font-mono" style={{ color:s.color }}>{s.n}</div>
+      <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4 border" style={{ background:s.color+"10", borderColor:s.color+"20" }}>
+        <s.icon size={18} style={{ color:s.color }} />
+      </div>
+      <h3 className="text-base font-bold text-slate-900 mb-2" style={{ fontFamily:SANS }}>{s.title}</h3>
+      <p className="text-xs text-slate-500 leading-relaxed" style={{ fontFamily:SANS }}>{s.desc}</p>
+    </motion.div>
   );
 }
 
