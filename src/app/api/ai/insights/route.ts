@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+import { validateApiKey } from "@/lib/api-auth";
 
-function validateApiKey(req: NextRequest): boolean {
-  const key = req.headers.get("x-api-key");
-  return key === process.env.CRM_API_KEY?.trim();
-}
 
 export async function POST(req: NextRequest) {
   if (!validateApiKey(req)) {

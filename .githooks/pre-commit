@@ -6,10 +6,16 @@
 # credential pasted into a curl call ends up stored verbatim. Gitignoring
 # that one file is not enough; this checks whatever is actually staged.
 #
+# The bare-hex rule ([0-9a-f]{40,}) exists because the original pattern only
+# matched prefixed tokens (ghp_, re_, sk-, AKIA...) and therefore produced no
+# signal for the one credential actually committed here: a 64-char hex
+# CRM_API_KEY. A long lowercase hex string may legitimately be a file hash or
+# lockfile digest, so this is the rule most likely to need --no-verify.
+#
 # Bypass for a genuine false positive:  git commit --no-verify
 
 # ERE syntax: interval quantifiers are {20,}, not \{20,\}.
-PATTERN='github_pat_[A-Za-z0-9_]{20,}|ghp_[A-Za-z0-9]{20,}|gho_[A-Za-z0-9]{20,}|ghs_[A-Za-z0-9]{20,}|re_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}'
+PATTERN='github_pat_[A-Za-z0-9_]{20,}|ghp_[A-Za-z0-9]{20,}|gho_[A-Za-z0-9]{20,}|ghs_[A-Za-z0-9]{20,}|re_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|[0-9a-f]{40,}'
 
 hits=$(git diff --cached --name-only --diff-filter=ACM | while read -r f; do
   git show ":$f" 2>/dev/null | grep -qE "$PATTERN" && printf '  %s\n' "$f"

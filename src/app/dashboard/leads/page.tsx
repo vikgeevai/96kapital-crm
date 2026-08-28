@@ -82,13 +82,30 @@ export default function LeadsPage() {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isDeleting, setIsDeleting] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
+  // No res.ok check and no catch previously: on a 401 the error object was
+  // pushed straight into state typed Lead[], which either crashed render or
+  // showed "0 leads" — an outage indistinguishable from an empty CRM.
   const fetchLeads = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const res = await fetch(`${CRM_URL}/api/leads`, { headers: { "x-api-key": API_KEY } });
+      if (!res.ok) {
+        throw new Error(
+          res.status === 401
+            ? "Not authorised — check NEXT_PUBLIC_CRM_API_KEY."
+            : `Could not load leads (HTTP ${res.status}).`
+        );
+      }
       const data = await res.json();
+      if (!Array.isArray(data)) throw new Error("Unexpected response from the server.");
       setLeads(data);
+    } catch (err) {
+      console.error("[leads] failed to load:", err);
+      setLoadError(err instanceof Error ? err.message : "Could not load leads.");
+      setLeads([]);
     } finally {
       setLoading(false);
     }
@@ -98,14 +115,28 @@ export default function LeadsPage() {
 
   const updateStatus = async (id: string, status: LeadStatus) => {
     setUpdatingId(id);
+    // Snapshot for rollback. The optimistic update used to stand even when the
+    // PATCH failed, so the badge read "Contacted" for the rest of the session
+    // while Postgres still had the lead as new.
+    const prevLeads = leads;
+    const prevSelected = selectedLead;
     setLeads(prev => prev.map(l => l.id === id ? { ...l, status } : l));
     if (selectedLead?.id === id) setSelectedLead(prev => prev ? { ...prev, status } : null);
-    await fetch(`${CRM_URL}/api/leads`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json", "x-api-key": API_KEY },
-      body: JSON.stringify({ id, status }),
-    });
-    setUpdatingId(null);
+    try {
+      const res = await fetch(`${CRM_URL}/api/leads`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-api-key": API_KEY },
+        body: JSON.stringify({ id, status }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    } catch (err) {
+      console.error("[leads] status update failed:", err);
+      setLeads(prevLeads);
+      setSelectedLead(prevSelected);
+      setLoadError("Could not save that status change — it has been reverted.");
+    } finally {
+      setUpdatingId(null);
+    }
   };
 
   const handleDelete = async (ids: string[]) => {
@@ -115,14 +146,25 @@ export default function LeadsPage() {
     if (!confirm(msg)) return;
     setIsDeleting(true);
     try {
-      await fetch(`${CRM_URL}/api/leads`, {
+      const res = await fetch(`${CRM_URL}/api/leads`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json", "x-api-key": API_KEY },
         body: JSON.stringify({ ids }),
       });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      // The route now reports rows actually removed, not the requested count.
+      const body = await res.json().catch(() => null);
+      if (body && typeof body.deleted === "number" && body.deleted !== ids.length) {
+        setLoadError(`Deleted ${body.deleted} of ${ids.length} — refreshing.`);
+        await fetchLeads();
+        return;
+      }
       setLeads(prev => prev.filter(l => !ids.includes(l.id)));
       setSelectedIds(new Set());
       if (selectedLead && ids.includes(selectedLead.id)) setSelectedLead(null);
+    } catch (err) {
+      console.error("[leads] delete failed:", err);
+      setLoadError("Could not delete — nothing was removed.");
     } finally {
       setIsDeleting(false);
     }
@@ -172,6 +214,24 @@ export default function LeadsPage() {
 
   return (
     <PageShell title="Leads Pipeline" subtitle={`${leads.length} total leads`}>
+      {/* A failed load used to render as "0 total leads", which reads as an
+          empty CRM rather than an outage. Say so explicitly instead. */}
+      {loadError && (
+        <div
+          className="mb-4 px-4 py-3 rounded-xl flex items-start gap-3"
+          role="alert"
+          style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)" }}
+        >
+          <span className="text-sm font-medium" style={{ color: "#ef4444" }}>{loadError}</span>
+          <button
+            onClick={fetchLeads}
+            className="ml-auto text-xs underline"
+            style={{ color: "#ef4444" }}
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
       {/* ── Source tabs (Business selector) ── */}
       {uniqueSources.length > 1 && (

@@ -35,13 +35,36 @@ export default function AlertsPage() {
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [markingId, setMarkingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
+  /**
+   * This page previously used try/finally with no catch and no res.ok check,
+   * doing `setUrgent(data.urgentLeads ?? [])`. On a 401 the body is
+   * {"error":"Unauthorized"}, so `?? []` produced an empty list and the page
+   * rendered "You're all caught up" — the page whose whole job is surfacing
+   * neglected leads reported all-clear precisely when it could not see them.
+   */
   const fetchAlerts = async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch(`${CRM_URL}/api/stats`, { headers: { "x-api-key": API_KEY } });
+      if (!res.ok) {
+        throw new Error(
+          res.status === 401
+            ? "Not authorised — check NEXT_PUBLIC_CRM_API_KEY."
+            : `Could not load alerts (HTTP ${res.status}).`
+        );
+      }
       const data = await res.json();
-      setUrgent(data.urgentLeads ?? []);
+      if (!Array.isArray(data.urgentLeads)) {
+        throw new Error("Unexpected response from the server.");
+      }
+      setUrgent(data.urgentLeads);
+    } catch (err) {
+      console.error("[alerts] failed to load:", err);
+      setError(err instanceof Error ? err.message : "Could not load alerts.");
+      setUrgent([]);
     } finally {
       setLoading(false);
     }
@@ -51,13 +74,22 @@ export default function AlertsPage() {
 
   const markContacted = async (id: string) => {
     setMarkingId(id);
-    await fetch(`${CRM_URL}/api/leads`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json", "x-api-key": API_KEY },
-      body: JSON.stringify({ id, status: "contacted" }),
-    });
-    setUrgent(prev => prev.filter(l => l.id !== id));
-    setMarkingId(null);
+    // Only drop the row once the write is confirmed. It used to be removed
+    // regardless of outcome, so a failed PATCH looked like a handled lead.
+    try {
+      const res = await fetch(`${CRM_URL}/api/leads`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-api-key": API_KEY },
+        body: JSON.stringify({ id, status: "contacted" }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setUrgent(prev => prev.filter(l => l.id !== id));
+    } catch (err) {
+      console.error("[alerts] mark contacted failed:", err);
+      setError("Could not mark that lead as contacted — it is still outstanding.");
+    } finally {
+      setMarkingId(null);
+    }
   };
 
   const dismiss = (id: string) => setDismissed(prev => new Set([...prev, id]));
@@ -113,6 +145,26 @@ export default function AlertsPage() {
                 style={{ borderColor: "var(--primary)", borderTopColor: "transparent" }} />
               <p className="text-sm">Checking for urgent leads…</p>
             </div>
+          </div>
+        ) : error ? (
+          /* Checked BEFORE the empty state on purpose: an unreachable API must
+             never be able to render as "All clear!". */
+          <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+            <AlertTriangle size={40} style={{ color: "#ef4444", opacity: 0.7, marginBottom: 12 }} />
+            <p className="text-base font-semibold" style={{ color: "#ef4444" }}>
+              Could not load alerts
+            </p>
+            <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>{error}</p>
+            <p className="text-xs mt-3" style={{ color: "var(--text-muted)" }}>
+              This is not an all-clear — urgent leads may exist that cannot be shown.
+            </p>
+            <button
+              onClick={fetchAlerts}
+              className="mt-4 px-4 py-2 rounded-xl text-sm font-medium"
+              style={{ background: "var(--bg-elevated)", border: "1px solid var(--glass-border)" }}
+            >
+              Try again
+            </button>
           </div>
         ) : visible.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16" style={{ color: "var(--text-muted)" }}>

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import sql, { initDb } from "@/lib/db";
+import { validateApiKey } from "@/lib/api-auth";
 
 function corsHeaders() {
   return {
@@ -9,10 +10,6 @@ function corsHeaders() {
   };
 }
 
-function validateApiKey(req: NextRequest): boolean {
-  const key = req.headers.get("x-api-key");
-  return key === process.env.CRM_API_KEY?.trim();
-}
 
 export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: corsHeaders() });

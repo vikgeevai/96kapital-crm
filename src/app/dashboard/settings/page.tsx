@@ -84,7 +84,15 @@ export default function SettingsPage() {
   const [copied, setCopied] = useState(false);
   const [snippetTab, setSnippetTab] = useState<"html" | "js">("html");
   const [snippetCopied, setSnippetCopied] = useState(false);
-  const apiKey = "353d47822cd9c6b3a3b382c099d36f3cf4331dce238cafe225218ab119d0c26f";
+  // Read from the environment, never a literal. This value was previously
+  // hardcoded here — and because this repo is public, it was readable from
+  // raw.githubusercontent.com with no authentication, and compiled into the
+  // client bundle besides. That key has been rotated.
+  //
+  // NEXT_PUBLIC_* is client-visible by design, which is what this settings
+  // page needs in order to display the integration key. It is not a substitute
+  // for keeping the value out of source control.
+  const apiKey = process.env.NEXT_PUBLIC_CRM_API_KEY ?? "";
   const endpoint = `${CRM_URL || "https://www.96kapital.com"}/api/leads`;
 
   const copyKey = () => {

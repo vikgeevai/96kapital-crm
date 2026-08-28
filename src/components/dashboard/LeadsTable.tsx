@@ -130,15 +130,21 @@ export function LeadsTable() {
   }, [leads, search, filterStatus, sortCol, sortDir]);
 
   const updateStatus = async (id: string, status: LeadStatus) => {
+    // Snapshot for rollback. The catch only saw network throws; a 401/404/500
+    // resolves normally, so a rejected write left the optimistic badge in
+    // place and the operator believed the lead was handled.
+    const prevLeads = leads;
     setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, status } : l)));
     try {
-      await fetch(`${CRM_URL}/api/leads`, {
+      const res = await fetch(`${CRM_URL}/api/leads`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", "x-api-key": API_KEY },
         body: JSON.stringify({ id, status }),
       });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
     } catch (e) {
       console.error("Failed to persist status update", e);
+      setLeads(prevLeads);
     }
   };
 

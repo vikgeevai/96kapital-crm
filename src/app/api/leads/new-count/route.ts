@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import sql, { initDb } from "@/lib/db";
+import { validateApiKey } from "@/lib/api-auth";
 
 const EXTRA_ORIGINS = (process.env.CORS_ORIGINS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
 const ALLOWED_ORIGINS = [
@@ -20,17 +21,6 @@ function corsHeaders(origin: string | null) {
   };
 }
 
-function validateApiKey(req: NextRequest): boolean {
-  const key = req.headers.get("x-api-key")?.trim();
-  if (!key) return false;
-  // CRM_API_KEY_PREVIOUS lets a key rotation run without downtime: set the new
-  // key here and the old one in _PREVIOUS, update every client, then clear
-  // _PREVIOUS. Clients are the KAPVOY site and the Indian Life Memorial site.
-  const accepted = [process.env.CRM_API_KEY, process.env.CRM_API_KEY_PREVIOUS]
-    .map((k) => k?.trim())
-    .filter((k): k is string => Boolean(k));
-  return accepted.includes(key);
-}
 
 export async function OPTIONS(req: NextRequest) {
   const origin = req.headers.get("origin");

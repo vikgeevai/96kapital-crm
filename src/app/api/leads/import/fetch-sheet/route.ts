@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { validateApiKey } from "@/lib/api-auth";
 
 const EXTRA_ORIGINS = (process.env.CORS_ORIGINS ?? "").split(",").map(s => s.trim()).filter(Boolean);
 const ALLOWED_ORIGINS = [
@@ -19,10 +20,6 @@ function corsHeaders(origin: string | null) {
   };
 }
 
-function validateApiKey(req: NextRequest): boolean {
-  const key = req.headers.get("x-api-key");
-  return key === process.env.CRM_API_KEY?.trim();
-}
 
 export async function OPTIONS(req: NextRequest) {
   const origin = req.headers.get("origin");

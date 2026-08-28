@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import sql, { initDb } from "@/lib/db";
+import { validateApiKey } from "@/lib/api-auth";
 import { sendCustomerEmail, sendBusinessLeadEmail } from "@/lib/email";
 
 // ── Green API WhatsApp admin notification ─────────────────────────────────
@@ -80,17 +81,6 @@ function corsHeaders(origin: string | null) {
   };
 }
 
-function validateApiKey(req: NextRequest): boolean {
-  const key = req.headers.get("x-api-key")?.trim();
-  if (!key) return false;
-  // CRM_API_KEY_PREVIOUS lets a key rotation run without downtime: set the new
-  // key here and the old one in _PREVIOUS, update every client, then clear
-  // _PREVIOUS. Clients are the KAPVOY site and the Indian Life Memorial site.
-  const accepted = [process.env.CRM_API_KEY, process.env.CRM_API_KEY_PREVIOUS]
-    .map((k) => k?.trim())
-    .filter((k): k is string => Boolean(k));
-  return accepted.includes(key);
-}
 
 // ── OPTIONS (preflight) ────────────────────────────────────────────────────
 export async function OPTIONS(req: NextRequest) {
@@ -284,15 +274,27 @@ export async function PATCH(req: NextRequest) {
   }
 
   const validStatuses = ["new", "contacted", "qualified", "junk", "archived"];
-  if (!body.id || !validStatuses.includes(body.status)) {
+  // parseInt("abc") is NaN, and the previous check only tested that body.id was
+  // truthy — so a non-numeric id reached the query and matched nothing while
+  // still returning success.
+  const leadId = Number(body.id);
+  if (!Number.isInteger(leadId) || !validStatuses.includes(body.status)) {
     return NextResponse.json({ error: "Invalid id or status" }, { status: 422, headers });
   }
 
   try {
-    await sql`
-      UPDATE leads SET status = ${body.status} WHERE id = ${parseInt(body.id)}
+    // Inspect the row count. Without this, updating a stale or deleted id
+    // returned { success: true } and the dashboard left its optimistic badge
+    // flipped, so the operator believed a lead was handled when it was not.
+    const updated = await sql`
+      UPDATE leads SET status = ${body.status} WHERE id = ${leadId}
+      RETURNING id
     `;
-    return NextResponse.json({ success: true }, { headers });
+    if (updated.length === 0) {
+      console.warn(`[/api/leads PATCH] no lead with id ${leadId}`);
+      return NextResponse.json({ error: "Lead not found" }, { status: 404, headers });
+    }
+    return NextResponse.json({ success: true, id: leadId, status: body.status }, { headers });
   } catch (err) {
     console.error("[/api/leads PATCH]", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500, headers });
@@ -322,8 +324,16 @@ export async function DELETE(req: NextRequest) {
 
   try {
     await initDb();
-    await sql`DELETE FROM leads WHERE id = ANY(${ids}::int[])`;
-    return NextResponse.json({ success: true, deleted: ids.length }, { headers });
+    // `deleted` used to be ids.length — the requested count, not the affected
+    // one — so a delete that matched nothing still reported every row removed.
+    const removed = await sql`
+      DELETE FROM leads WHERE id = ANY(${ids}::int[])
+      RETURNING id
+    `;
+    if (removed.length !== ids.length) {
+      console.warn(`[/api/leads DELETE] requested ${ids.length}, removed ${removed.length}`);
+    }
+    return NextResponse.json({ success: true, deleted: removed.length, requested: ids.length }, { headers });
   } catch (err) {
     console.error("[/api/leads DELETE]", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500, headers });
