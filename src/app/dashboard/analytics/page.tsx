@@ -61,12 +61,35 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<7 | 14 | 30>(30);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   useEffect(() => {
+    // Every chart on this page reads `stats?.x ?? []`. Without a status check
+    // a 401 or 500 left stats null, so the whole page rendered as a complete
+    // set of charts reading zero — indistinguishable from a real quiet month.
     fetch("/api/stats")
-      .then(r => r.json())
+      .then(async r => {
+        if (!r.ok) throw new Error(`/api/stats returned HTTP ${r.status}`);
+        return r.json();
+      })
       .then(d => { setStats(d); setLoading(false); })
-      .catch(() => setLoading(false));
+      .catch(err => {
+        console.error("[analytics] could not load stats:", err);
+        setLoadError("Could not load analytics. Refresh the page, or sign in again if your session has expired.");
+        setLoading(false);
+      });
   }, []);
+
+  if (loadError) return (
+    <PageShell title="Analytics" subtitle="Business intelligence">
+      <div
+        className="p-4 border text-sm"
+        style={{ background: "rgba(239,68,68,0.08)", borderColor: "rgba(239,68,68,0.2)", color: "#ef4444" }}
+      >
+        {loadError}
+      </div>
+    </PageShell>
+  );
 
   if (loading) return (
     <PageShell title="Analytics" subtitle="Business intelligence">

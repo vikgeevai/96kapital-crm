@@ -15,11 +15,21 @@ export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState<Tab>("Overview");
   const [refreshing, setRefreshing] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  // Every panel below fetches its own data on mount, so bumping this key
+  // remounts them and they refetch. Refresh used to be `await sleep(800)` and
+  // nothing else: the icon spun, the button felt responsive, and not one
+  // request was made. Beside a hardcoded "Last synced: just now", that is a
+  // dashboard that can show week-old numbers and insist they are current.
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [lastSynced, setLastSynced] = useState<Date | null>(null);
 
-  const handleRefresh = async () => {
+  const handleRefresh = () => {
     setRefreshing(true);
-    await new Promise((r) => setTimeout(r, 800));
-    setRefreshing(false);
+    setRefreshKey((k) => k + 1);
+    setLastSynced(new Date());
+    // The panels refetch on remount; this only governs how long the icon
+    // spins, so it stays short and does not pretend to track completion.
+    setTimeout(() => setRefreshing(false), 600);
   };
 
   return (
@@ -51,7 +61,9 @@ export default function DashboardPage() {
                 Command Centre
               </h1>
               <p className="hidden sm:block text-xs font-mono-data" style={{ color: "var(--text-muted)" }}>
-                Last synced: just now
+                {lastSynced
+                  ? `Last synced: ${lastSynced.toLocaleTimeString("en-SG", { hour: "2-digit", minute: "2-digit" })}`
+                  : "Last synced: on page load"}
               </p>
             </div>
           </div>
@@ -168,28 +180,28 @@ export default function DashboardPage() {
 
           {/* KPIs */}
           <div className="mb-5 lg:mb-6">
-            <KPICards />
+            <KPICards key={refreshKey} />
           </div>
 
           {(activeTab === "Overview" || activeTab === "Analytics") && (
             <>
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
-                <div className="lg:col-span-2"><LeadVolumeChart /></div>
-                <StatusDonut />
+                <div className="lg:col-span-2"><LeadVolumeChart key={refreshKey} /></div>
+                <StatusDonut key={refreshKey} />
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5 lg:mb-6">
-                <TopSources />
-                <div className="lg:col-span-2"><CalendarHeatmap /></div>
+                <TopSources key={refreshKey} />
+                <div className="lg:col-span-2"><CalendarHeatmap key={refreshKey} /></div>
               </div>
             </>
           )}
 
           {(activeTab === "Overview" || activeTab === "Leads") && (
-            <div className="mb-5 lg:mb-6"><LeadsTable /></div>
+            <div className="mb-5 lg:mb-6"><LeadsTable key={refreshKey} /></div>
           )}
 
           {(activeTab === "Overview" || activeTab === "AI Insights") && (
-            <div className="mb-5 lg:mb-6"><AIInsights /></div>
+            <div className="mb-5 lg:mb-6"><AIInsights key={refreshKey} /></div>
           )}
         </main>
       </div>

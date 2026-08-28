@@ -22,12 +22,22 @@ function minutesAgo(dateStr: string): number {
 export function AIInsights() {
   const [insights, setInsights] = useState<Insight[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([
-      fetch("/api/stats").then(r => r.json()),
-      fetch("/api/leads").then(r => r.json()),
-    ]).then(([stats, leads]) => {
+    // Both responses used to go straight to .json() with no status check, and
+    // the catch was `() => setLoading(false)`. A 401 or a 500 therefore parsed
+    // to something without a `total`, fell through to the `total === 0` branch,
+    // and rendered "No leads yet — insights will appear once enquiries come
+    // in" inside a card badged *Live*. A broken dashboard looked like a quiet
+    // business.
+    const asJson = async (url: string) => {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`${url} returned HTTP ${res.status}`);
+      return res.json();
+    };
+
+    Promise.all([asJson("/api/stats"), asJson("/api/leads")]).then(([stats, leads]) => {
       const total = stats?.total ?? 0;
       const allLeads: any[] = Array.isArray(leads) ? leads : [];
       const newLeads = allLeads.filter(l => l.status === "new");
@@ -85,7 +95,11 @@ export function AIInsights() {
 
       setInsights(computed.slice(0, 4));
       setLoading(false);
-    }).catch(() => setLoading(false));
+    }).catch((err) => {
+      console.error("[insights] could not load:", err);
+      setError("Insights are unavailable — the dashboard could not reach the API.");
+      setLoading(false);
+    });
   }, []);
 
   return (
@@ -119,6 +133,15 @@ export function AIInsights() {
           {[1, 2, 3, 4].map(i => (
             <div key={i} className="h-[72px] rounded animate-pulse" style={{ background: "rgba(255,255,255,0.04)" }} />
           ))}
+        </div>
+      ) : error ? (
+        /* Before the empty state, never after it: an unreachable API must not
+           be able to render as "no leads". */
+        <div
+          className="p-4 border text-sm"
+          style={{ background: "rgba(239,68,68,0.08)", borderColor: "rgba(239,68,68,0.2)", color: "#ef4444" }}
+        >
+          {error}
         </div>
       ) : (
         <div className="space-y-2">

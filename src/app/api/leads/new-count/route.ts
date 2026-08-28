@@ -1,35 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import sql, { initDb } from "@/lib/db";
 import { authorizeDashboardRequest } from "@/lib/api-auth";
+import { corsHeaders } from "@/lib/cors";
 
-const EXTRA_ORIGINS = (process.env.CORS_ORIGINS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-const ALLOWED_ORIGINS = [
-  "https://www.96kapital.com",
-  "https://96kapital.com",
-  "https://96kapital.vercel.app",
-  "http://localhost:5173",
-  "http://localhost:3000",
-  ...EXTRA_ORIGINS,
-];
 
-function corsHeaders(origin: string | null) {
-  const allowed = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
-  return {
-    "Access-Control-Allow-Origin": allowed,
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, x-api-key",
-  };
-}
 
 
 export async function OPTIONS(req: NextRequest) {
   const origin = req.headers.get("origin");
-  return new NextResponse(null, { status: 204, headers: corsHeaders(origin) });
+  return new NextResponse(null, { status: 204, headers: corsHeaders(origin, "GET, OPTIONS") });
 }
 
 export async function GET(req: NextRequest) {
   const origin = req.headers.get("origin");
-  const headers = corsHeaders(origin);
+  const headers = corsHeaders(origin, "GET, OPTIONS");
 
   // Session (dashboard, same-origin cookie) or API key (server-to-server).
   // See authorizeDashboardRequest in @/lib/api-auth.

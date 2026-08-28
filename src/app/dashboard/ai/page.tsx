@@ -64,15 +64,28 @@ export default function AIPage() {
   const [claudeError, setClaudeError] = useState<string | null>(null);
   const [generatedAt, setGeneratedAt] = useState<string | null>(null);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   useEffect(() => {
-    Promise.all([
-      fetch("/api/stats").then(r => r.json()),
-      fetch("/api/leads").then(r => r.json()),
-    ]).then(([s, l]) => {
+    // Status-checked. Unchecked .json() on a 401 left stats null and leads
+    // empty, and the page then rendered its ordinary zero state — the
+    // "Generate" button quietly disabled by `if (!stats) return`, with nothing
+    // saying the data never arrived.
+    const asJson = async (url: string) => {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`${url} returned HTTP ${res.status}`);
+      return res.json();
+    };
+
+    Promise.all([asJson("/api/stats"), asJson("/api/leads")]).then(([s, l]) => {
       setStats(s);
       setLeads(Array.isArray(l) ? l : []);
       setLoading(false);
-    }).catch(() => setLoading(false));
+    }).catch((err) => {
+      console.error("[ai] could not load dashboard data:", err);
+      setLoadError("Could not load your data. Refresh the page, or sign in again if your session has expired.");
+      setLoading(false);
+    });
   }, []);
 
   const handleGenerateAI = async () => {
@@ -100,6 +113,17 @@ export default function AIPage() {
       setGenerating(false);
     }
   };
+
+  if (loadError) return (
+    <PageShell title="AI Insights" subtitle="Powered by your data">
+      <div
+        className="p-4 border text-sm"
+        style={{ background: "rgba(239,68,68,0.08)", borderColor: "rgba(239,68,68,0.2)", color: "#ef4444" }}
+      >
+        {loadError}
+      </div>
+    </PageShell>
+  );
 
   if (loading) return (
     <PageShell title="AI Insights" subtitle="Powered by your data">

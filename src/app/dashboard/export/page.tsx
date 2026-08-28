@@ -41,6 +41,7 @@ export default function ExportPage() {
   const [exporting, setExporting] = useState(false);
   const [exported, setExported] = useState(false);
   const [count, setCount] = useState<number | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   const toggleField = (key: string) => {
     setSelectedFields(prev =>
@@ -51,9 +52,17 @@ export default function ExportPage() {
   const handleExport = async () => {
     setExporting(true);
     setExported(false);
+    setExportError(null);
     try {
+      // This had a try/finally and no catch. On a 401 the response body is
+      // {error:"Unauthorized"} — an object, so `leads.filter` threw, the
+      // rejection went unhandled, and all the user saw was the spinner
+      // stopping. No file, no message, no explanation.
       const res = await fetch("/api/leads");
-      let leads: any[] = await res.json();
+      if (!res.ok) throw new Error(`/api/leads returned HTTP ${res.status}`);
+      const body = await res.json();
+      if (!Array.isArray(body)) throw new Error("Unexpected response from /api/leads");
+      let leads: any[] = body;
 
       // Filter by status
       if (statusFilter !== "all") {
@@ -74,6 +83,11 @@ export default function ExportPage() {
       a.click();
       URL.revokeObjectURL(url);
       setExported(true);
+    } catch (err) {
+      console.error("[export] failed:", err);
+      setExportError(
+        "Could not export. Refresh the page, or sign in again if your session has expired."
+      );
     } finally {
       setExporting(false);
     }
@@ -201,6 +215,15 @@ export default function ExportPage() {
               )}
             </motion.button>
           </div>
+
+          {exportError && (
+            <div
+              className="mt-4 p-3 border text-sm"
+              style={{ background: "rgba(239,68,68,0.08)", borderColor: "rgba(239,68,68,0.2)", color: "#ef4444" }}
+            >
+              {exportError}
+            </div>
+          )}
         </div>
 
         {/* Tips */}
