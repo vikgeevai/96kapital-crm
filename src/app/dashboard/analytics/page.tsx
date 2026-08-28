@@ -8,8 +8,6 @@ import {
 import { TrendingUp, Users, DollarSign, Clock, ArrowUpRight } from "lucide-react";
 import { motion } from "framer-motion";
 
-const CRM_URL = process.env.NEXT_PUBLIC_CRM_URL ?? "";
-const API_KEY = process.env.NEXT_PUBLIC_CRM_API_KEY ?? "";
 
 const STATUS_COLORS: Record<string, string> = {
   new: "#10b981", contacted: "#3b82f6", qualified: "#8b5cf6",
@@ -64,7 +62,7 @@ export default function AnalyticsPage() {
   const [timeRange, setTimeRange] = useState<7 | 14 | 30>(30);
 
   useEffect(() => {
-    fetch(`${CRM_URL}/api/stats`, { headers: { "x-api-key": API_KEY } })
+    fetch("/api/stats")
       .then(r => r.json())
       .then(d => { setStats(d); setLoading(false); })
       .catch(() => setLoading(false));

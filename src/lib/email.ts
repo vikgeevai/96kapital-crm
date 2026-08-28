@@ -1,6 +1,25 @@
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+/**
+ * Constructed on first send, not at import.
+ *
+ * `new Resend(undefined)` throws immediately. At module scope that turned a
+ * missing RESEND_API_KEY into a build-time crash: Next imports this file
+ * while collecting page data for /api/leads, so the entire build died —
+ * because *email* was misconfigured. Deferring it keeps the failure
+ * proportionate. The site builds and serves, and a missing key is reported
+ * by deliver() as an ordinary send failure, in the same place every other
+ * email problem already surfaces.
+ */
+let client: Resend | null = null;
+
+function getResend(): Resend | null {
+  if (client) return client;
+  const key = process.env.RESEND_API_KEY?.trim();
+  if (!key) return null;
+  client = new Resend(key);
+  return client;
+}
 
 const BUSINESS_EMAIL = process.env.BUSINESS_EMAIL ?? "hello@96kapital.com";
 const FROM_EMAIL = process.env.RESEND_FROM
@@ -24,8 +43,16 @@ const WHATSAPP_NUMBER = process.env.WHATSAPP_NUMBER ?? "";
  */
 async function deliver(
   label: string,
-  payload: Parameters<typeof resend.emails.send>[0]
+  payload: Parameters<Resend["emails"]["send"]>[0]
 ): Promise<boolean> {
+  const resend = getResend();
+  if (!resend) {
+    console.error(
+      `[email] ${label} NOT SENT — RESEND_API_KEY is not set. No notification ` +
+      `was delivered for this lead.`
+    );
+    return false;
+  }
   try {
     const { data, error } = await resend.emails.send(payload);
     if (error) {

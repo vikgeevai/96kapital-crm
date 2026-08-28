@@ -4,8 +4,6 @@ import { Target, TrendingUp, AlertTriangle, Info, Zap } from "lucide-react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 
-const CRM_URL = process.env.NEXT_PUBLIC_CRM_URL ?? "";
-const API_KEY = process.env.NEXT_PUBLIC_CRM_API_KEY ?? "";
 
 const TYPE_CONFIG = {
   critical: { icon: AlertTriangle, color: "#ef4444", bg: "rgba(239,68,68,0.08)",   border: "rgba(239,68,68,0.2)"   },
@@ -27,8 +25,8 @@ export function AIInsights() {
 
   useEffect(() => {
     Promise.all([
-      fetch(`${CRM_URL}/api/stats`, { headers: { "x-api-key": API_KEY } }).then(r => r.json()),
-      fetch(`${CRM_URL}/api/leads`, { headers: { "x-api-key": API_KEY } }).then(r => r.json()),
+      fetch("/api/stats").then(r => r.json()),
+      fetch("/api/leads").then(r => r.json()),
     ]).then(([stats, leads]) => {
       const total = stats?.total ?? 0;
       const allLeads: any[] = Array.isArray(leads) ? leads : [];

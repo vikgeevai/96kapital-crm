@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import sql, { initDb } from "@/lib/db";
-import { validateApiKey } from "@/lib/api-auth";
+import { validateApiKey, authorizeDashboardRequest } from "@/lib/api-auth";
 import { sendCustomerEmail, sendBusinessLeadEmail } from "@/lib/email";
 
 // ── Green API WhatsApp admin notification ─────────────────────────────────
@@ -226,7 +226,9 @@ export async function GET(req: NextRequest) {
   const origin = req.headers.get("origin");
   const headers = corsHeaders(origin);
 
-  if (!validateApiKey(req)) {
+  // Session (dashboard, same-origin cookie) or API key (server-to-server).
+  // See authorizeDashboardRequest in @/lib/api-auth.
+  if (!(await authorizeDashboardRequest(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers });
   }
 
@@ -262,7 +264,9 @@ export async function PATCH(req: NextRequest) {
   const origin = req.headers.get("origin");
   const headers = corsHeaders(origin);
 
-  if (!validateApiKey(req)) {
+  // Session (dashboard, same-origin cookie) or API key (server-to-server).
+  // See authorizeDashboardRequest in @/lib/api-auth.
+  if (!(await authorizeDashboardRequest(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers });
   }
 
@@ -306,7 +310,9 @@ export async function DELETE(req: NextRequest) {
   const origin = req.headers.get("origin");
   const headers = corsHeaders(origin);
 
-  if (!validateApiKey(req)) {
+  // Session (dashboard, same-origin cookie) or API key (server-to-server).
+  // See authorizeDashboardRequest in @/lib/api-auth.
+  if (!(await authorizeDashboardRequest(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers });
   }
 

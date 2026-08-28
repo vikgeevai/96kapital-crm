@@ -7,8 +7,6 @@ import {
   Star, ArrowRight, Brain, Target, BarChart3, Sparkles, RefreshCw,
 } from "lucide-react";
 
-const CRM_URL = process.env.NEXT_PUBLIC_CRM_URL ?? "";
-const API_KEY = process.env.NEXT_PUBLIC_CRM_API_KEY ?? "";
 
 interface Lead {
   id: string;
@@ -68,8 +66,8 @@ export default function AIPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch(`${CRM_URL}/api/stats`, { headers: { "x-api-key": API_KEY } }).then(r => r.json()),
-      fetch(`${CRM_URL}/api/leads`, { headers: { "x-api-key": API_KEY } }).then(r => r.json()),
+      fetch("/api/stats").then(r => r.json()),
+      fetch("/api/leads").then(r => r.json()),
     ]).then(([s, l]) => {
       setStats(s);
       setLeads(Array.isArray(l) ? l : []);
@@ -82,9 +80,9 @@ export default function AIPage() {
     setGenerating(true);
     setClaudeError(null);
     try {
-      const res = await fetch(`${CRM_URL}/api/ai/insights`, {
+      const res = await fetch("/api/ai/insights", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-api-key": API_KEY },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ stats }),
       });
       if (res.status === 503) {

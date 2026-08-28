@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { getSession } from "@/lib/auth";
 
 /**
  * The one API-key check for every machine-facing route.
@@ -36,4 +37,35 @@ export function validateApiKey(req: NextRequest): boolean {
     return false;
   }
   return accepted.includes(key);
+}
+
+/**
+ * The guard for routes the dashboard calls: a valid session **or** a valid
+ * API key.
+ *
+ * The dashboard used to authenticate to its own API with
+ * NEXT_PUBLIC_CRM_API_KEY. `NEXT_PUBLIC_` means Next inlines the value into
+ * the client bundle at build time, so the key that also authorises the
+ * external lead-posting endpoint was shipped to every visitor's browser.
+ * Rotating it changed the value, not the exposure.
+ *
+ * The session cookie is the fix: it is httpOnly, path "/", SameSite=Lax, so
+ * it already rides along on every same-origin /api/* fetch and the browser
+ * never hands its contents to script. SameSite=Lax also blocks cross-site
+ * mutations, so this brings CSRF protection with it.
+ *
+ * Note proxy.ts's matcher is ["/dashboard/:path*", "/login"] — it does not
+ * run for /api/*, deliberately, since widening it would start intercepting
+ * POST /api/leads from the external sites. So these routes must check the
+ * cookie themselves; that is what this function is for.
+ *
+ * Session **or** key, not session-only: the evidence says these routes are
+ * dashboard-only, but if some other caller does use one, session-only would
+ * break it silently — the precise failure mode this whole sweep is about.
+ * Removing the key from the browser is what closes the exposure; a route
+ * still accepting a key from a server-to-server caller costs nothing.
+ */
+export async function authorizeDashboardRequest(req: NextRequest): Promise<boolean> {
+  if (await getSession(req.cookies)) return true;
+  return validateApiKey(req);
 }

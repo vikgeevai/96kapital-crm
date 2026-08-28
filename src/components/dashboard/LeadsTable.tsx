@@ -7,8 +7,6 @@ import {
 import { Lead, LeadStatus } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
-const CRM_URL = process.env.NEXT_PUBLIC_CRM_URL ?? "";
-const API_KEY = process.env.NEXT_PUBLIC_CRM_API_KEY ?? "";
 
 const STATUS_CONFIG: Record<LeadStatus, { label: string; color: string; bg: string }> = {
   new:       { label: "New",       color: "#10b981", bg: "rgba(16,185,129,0.12)"  },
@@ -85,9 +83,7 @@ export function LeadsTable() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${CRM_URL}/api/leads`, {
-        headers: { "x-api-key": API_KEY },
-      });
+      const res = await fetch("/api/leads");
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setLeads(data);
@@ -136,9 +132,9 @@ export function LeadsTable() {
     const prevLeads = leads;
     setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, status } : l)));
     try {
-      const res = await fetch(`${CRM_URL}/api/leads`, {
+      const res = await fetch("/api/leads", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", "x-api-key": API_KEY },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, status }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);

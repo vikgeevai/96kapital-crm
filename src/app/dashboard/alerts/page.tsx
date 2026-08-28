@@ -7,8 +7,6 @@ import {
   Bell, Zap, RefreshCw, X,
 } from "lucide-react";
 
-const CRM_URL = process.env.NEXT_PUBLIC_CRM_URL ?? "";
-const API_KEY = process.env.NEXT_PUBLIC_CRM_API_KEY ?? "";
 
 interface UrgentLead {
   id: string;
@@ -48,11 +46,11 @@ export default function AlertsPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${CRM_URL}/api/stats`, { headers: { "x-api-key": API_KEY } });
+      const res = await fetch("/api/stats");
       if (!res.ok) {
         throw new Error(
           res.status === 401
-            ? "Not authorised — check NEXT_PUBLIC_CRM_API_KEY."
+            ? "Your session has expired — sign in again."
             : `Could not load alerts (HTTP ${res.status}).`
         );
       }
@@ -77,9 +75,9 @@ export default function AlertsPage() {
     // Only drop the row once the write is confirmed. It used to be removed
     // regardless of outcome, so a failed PATCH looked like a handled lead.
     try {
-      const res = await fetch(`${CRM_URL}/api/leads`, {
+      const res = await fetch("/api/leads", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", "x-api-key": API_KEY },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, status: "contacted" }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);

@@ -44,7 +44,10 @@ export async function verifySessionToken(
 ): Promise<{ email: string } | null> {
   try {
     const secret = process.env.AUTH_SECRET;
-    if (!secret) return null;
+    if (!secret) {
+      warnNoSecret();
+      return null;
+    }
 
     const dot = token.lastIndexOf(".");
     if (dot < 0) return null;
@@ -68,4 +71,51 @@ export async function verifySessionToken(
   } catch {
     return null;
   }
+}
+
+/**
+ * One warning per process when AUTH_SECRET is missing.
+ *
+ * Failing closed is right — an unsigned session must never be trusted — but
+ * doing it in silence is indistinguishable from a broken login: you sign in,
+ * the cookie is set, the proxy rejects it, you land back on /login, forever,
+ * with nothing in the logs saying why.
+ */
+let warnedNoSecret = false;
+function warnNoSecret(): void {
+  if (warnedNoSecret) return;
+  warnedNoSecret = true;
+  console.error(
+    "[auth] AUTH_SECRET is not set — every session is rejected. Logins will " +
+      "appear to succeed and then bounce straight back to /login."
+  );
+}
+
+/**
+ * Anything that can read a cookie by name.
+ *
+ * Structural rather than a concrete type so the same helper serves both
+ * callers: `req.cookies` on a NextRequest (Edge, in proxy.ts) and the store
+ * returned by `cookies()` from next/headers (Node, in server components).
+ * Both expose exactly this.
+ */
+type CookieReader = { get(name: string): { value: string } | undefined };
+
+/**
+ * Read and verify the session cookie. The single definition.
+ *
+ * These three lines were inlined in proxy.ts and dashboard/layout.tsx, and
+ * are now needed by the dashboard API routes too — three copies of an auth
+ * check is how one of them ends up subtly weaker than the others, which is
+ * exactly what happened to validateApiKey (see api-auth.ts).
+ *
+ * Returns null for absent, malformed, unsigned and expired tokens alike, and
+ * never throws.
+ */
+export async function getSession(
+  cookies: CookieReader
+): Promise<{ email: string } | null> {
+  const token = cookies.get(COOKIE_NAME)?.value;
+  if (!token) return null;
+  return verifySessionToken(token);
 }

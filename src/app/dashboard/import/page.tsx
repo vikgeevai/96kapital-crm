@@ -9,7 +9,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 
-const API_KEY = process.env.NEXT_PUBLIC_CRM_API_KEY ?? "";
 
 // ── CRM fields available for column mapping ───────────────────────────────
 const CRM_FIELDS = [
@@ -146,7 +145,7 @@ export default function ImportPage() {
     try {
       const res = await fetch("/api/leads/import/fetch-sheet", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-api-key": API_KEY },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: sheetUrl.trim() }),
       });
       const data = await res.json();
@@ -180,7 +179,7 @@ export default function ImportPage() {
     try {
       const res = await fetch("/api/leads/import", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-api-key": API_KEY },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ leads }),
       });
       const data = await res.json();

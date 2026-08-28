@@ -1,23 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import sql, { initDb } from "@/lib/db";
-import { validateApiKey } from "@/lib/api-auth";
+import { authorizeDashboardRequest } from "@/lib/api-auth";
 
-function corsHeaders() {
-  return {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, x-api-key",
-  };
-}
-
-
+/**
+ * No CORS headers, deliberately.
+ *
+ * This route used to answer `Access-Control-Allow-Origin: "*"`, which let any
+ * website on the internet read the response from a visitor's browser. The
+ * response is not aggregate-only: it carries urgentLeads and recentLeads,
+ * including names, phone numbers and email addresses.
+ *
+ * Its only caller is the dashboard, which is same-origin and therefore needs
+ * no CORS at all. The OPTIONS handler stays so a stray preflight gets a clean
+ * 204 rather than a 405, but it no longer grants anyone access.
+ */
 export async function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: corsHeaders() });
+  return new NextResponse(null, { status: 204 });
 }
 
 export async function GET(req: NextRequest) {
-  const headers = corsHeaders();
-  if (!validateApiKey(req)) {
+  const headers = { "Cache-Control": "no-store" } as const;
+  // Session (dashboard, same-origin cookie) or API key (server-to-server).
+  // See authorizeDashboardRequest in @/lib/api-auth.
+  if (!(await authorizeDashboardRequest(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers });
   }
 

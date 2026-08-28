@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PageShell } from "@/components/dashboard/PageShell";
 import { motion } from "framer-motion";
 import {
@@ -84,18 +84,47 @@ export default function SettingsPage() {
   const [copied, setCopied] = useState(false);
   const [snippetTab, setSnippetTab] = useState<"html" | "js">("html");
   const [snippetCopied, setSnippetCopied] = useState(false);
-  // Read from the environment, never a literal. This value was previously
-  // hardcoded here — and because this repo is public, it was readable from
-  // raw.githubusercontent.com with no authentication, and compiled into the
-  // client bundle besides. That key has been rotated.
+  // Fetched, not inlined.
   //
-  // NEXT_PUBLIC_* is client-visible by design, which is what this settings
-  // page needs in order to display the integration key. It is not a substitute
-  // for keeping the value out of source control.
-  const apiKey = process.env.NEXT_PUBLIC_CRM_API_KEY ?? "";
+  // This value was once a literal in this file — and because the repo is
+  // public, it was readable from raw.githubusercontent.com with no
+  // authentication. It was then moved to NEXT_PUBLIC_CRM_API_KEY, which fixed
+  // source control but not the browser: NEXT_PUBLIC_* is substituted into the
+  // client bundle at build time, so the key still shipped to every visitor.
+  //
+  // It now comes from GET /api/settings/integration-key, which requires a
+  // valid session cookie — so it reaches an authenticated admin who asks for
+  // it, and nobody else.
+  const [apiKey, setApiKey] = useState<string | null>(null);
+  const [keyError, setKeyError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/settings/integration-key", { cache: "no-store" });
+        const body = await res.json().catch(() => null);
+        if (!res.ok) throw new Error(body?.error ?? `HTTP ${res.status}`);
+        if (!cancelled) setApiKey(body.key);
+      } catch (err) {
+        console.error("[settings] could not load the integration key:", err);
+        if (!cancelled) {
+          setKeyError(
+            err instanceof Error ? err.message : "Could not load the integration key."
+          );
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // The snippets are shown before the key arrives (and if it never does), so
+  // they carry an obvious placeholder rather than the string "null".
+  const keyForSnippet = apiKey ?? "YOUR_API_KEY";
   const endpoint = `${CRM_URL || "https://www.96kapital.com"}/api/leads`;
 
   const copyKey = () => {
+    if (!apiKey) return;
     navigator.clipboard.writeText(apiKey);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -119,7 +148,7 @@ document.getElementById('crm-form').addEventListener('submit', async (e) => {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-api-key': '${apiKey}',
+      'x-api-key': '${keyForSnippet}',
     },
     body: JSON.stringify(data),
   });
@@ -132,7 +161,7 @@ await fetch('${endpoint}', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
-    'x-api-key': '${apiKey}',
+    'x-api-key': '${keyForSnippet}',
   },
   body: JSON.stringify({
     name: 'Alex Rivera',       // required
@@ -244,7 +273,7 @@ await fetch('${endpoint}', {
               <div className="flex items-center gap-2">
                 <div className="flex-1 px-3 py-2.5 rounded-xl text-xs font-mono overflow-hidden"
                   style={{ background: "rgba(255,255,255,0.03)", border: "1px solid var(--glass-border)", color: "var(--text-secondary)" }}>
-                  {showKey ? apiKey : "•".repeat(32)}
+                  {keyError ? keyError : apiKey === null ? "Loading…" : showKey ? apiKey : "•".repeat(32)}
                 </div>
                 <button onClick={() => setShowKey(!showKey)}
                   className="w-9 h-9 flex items-center justify-center rounded-xl border"

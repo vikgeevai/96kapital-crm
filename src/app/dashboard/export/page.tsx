@@ -4,8 +4,6 @@ import { PageShell } from "@/components/dashboard/PageShell";
 import { Download, FileSpreadsheet, CheckCircle2, RefreshCw, Calendar, Filter } from "lucide-react";
 import { motion } from "framer-motion";
 
-const CRM_URL = process.env.NEXT_PUBLIC_CRM_URL ?? "";
-const API_KEY = process.env.NEXT_PUBLIC_CRM_API_KEY ?? "";
 
 const ALL_FIELDS = [
   { key: "name",           label: "Name" },
@@ -54,7 +52,7 @@ export default function ExportPage() {
     setExporting(true);
     setExported(false);
     try {
-      const res = await fetch(`${CRM_URL}/api/leads`, { headers: { "x-api-key": API_KEY } });
+      const res = await fetch("/api/leads");
       let leads: any[] = await res.json();
 
       // Filter by status

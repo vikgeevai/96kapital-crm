@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { validateApiKey } from "@/lib/api-auth";
+import { authorizeDashboardRequest } from "@/lib/api-auth";
 
 
 export async function POST(req: NextRequest) {
-  if (!validateApiKey(req)) {
+  // Session (dashboard, same-origin cookie) or API key (server-to-server).
+  // See authorizeDashboardRequest in @/lib/api-auth.
+  if (!(await authorizeDashboardRequest(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

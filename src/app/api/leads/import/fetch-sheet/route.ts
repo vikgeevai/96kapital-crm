@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { validateApiKey } from "@/lib/api-auth";
+import { authorizeDashboardRequest } from "@/lib/api-auth";
 
 const EXTRA_ORIGINS = (process.env.CORS_ORIGINS ?? "").split(",").map(s => s.trim()).filter(Boolean);
 const ALLOWED_ORIGINS = [
@@ -61,7 +61,9 @@ export async function POST(req: NextRequest) {
   const origin = req.headers.get("origin");
   const headers = corsHeaders(origin);
 
-  if (!validateApiKey(req)) {
+  // Session (dashboard, same-origin cookie) or API key (server-to-server).
+  // See authorizeDashboardRequest in @/lib/api-auth.
+  if (!(await authorizeDashboardRequest(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers });
   }
 

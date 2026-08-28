@@ -28,20 +28,24 @@ function SidebarContent({ collapsed, onClose }: { collapsed?: boolean; onClose?:
   const [newLeadsCount, setNewLeadsCount] = useState<number | null>(null);
 
   useEffect(() => {
-    const apiKey = process.env.NEXT_PUBLIC_CRM_API_KEY;
-    if (!apiKey) return;
-
+    // The session cookie authenticates this; it is httpOnly and same-origin,
+    // so it is sent automatically. The previous version read
+    // NEXT_PUBLIC_CRM_API_KEY and bailed out with `if (!apiKey) return`, which
+    // meant that the moment that env var went away the badge would vanish
+    // permanently — with no request, no error and nothing in the console to
+    // say why.
     const fetchCount = async () => {
       try {
-        const res = await fetch("/api/leads/new-count", {
-          headers: { "x-api-key": apiKey },
-          cache: "no-store",
-        });
-        if (res.ok) {
-          const { count } = await res.json();
-          setNewLeadsCount(count);
+        const res = await fetch("/api/leads/new-count", { cache: "no-store" });
+        if (!res.ok) {
+          console.error(`[sidebar] new-count failed: HTTP ${res.status}`);
+          return;
         }
-      } catch { /* silent — badge just won't show */ }
+        const { count } = await res.json();
+        setNewLeadsCount(count);
+      } catch (err) {
+        console.error("[sidebar] new-count request failed:", err);
+      }
     };
 
     fetchCount();

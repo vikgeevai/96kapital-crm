@@ -1,25 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifySessionToken, COOKIE_NAME } from "@/lib/auth";
+import { getSession, COOKIE_NAME } from "@/lib/auth";
 
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // ── Protect all /dashboard routes ──────────────────────────────────────
   if (pathname.startsWith("/dashboard")) {
-    const token = req.cookies.get(COOKIE_NAME)?.value;
-
-    if (!token) {
-      const loginUrl = new URL("/login", req.url);
-      loginUrl.searchParams.set("from", pathname);
-      return NextResponse.redirect(loginUrl);
-    }
-
-    const user = await verifySessionToken(token);
+    const user = await getSession(req.cookies);
     if (!user) {
       const loginUrl = new URL("/login", req.url);
       loginUrl.searchParams.set("from", pathname);
       const res = NextResponse.redirect(loginUrl);
-      // Clear invalid cookie
+      // Clear the cookie on the way out. Previously only the "present but
+      // invalid" branch did this; doing it unconditionally is a no-op when
+      // there was no cookie, and removes the need for two branches.
       res.cookies.set(COOKIE_NAME, "", { maxAge: 0, path: "/" });
       return res;
     }
@@ -30,12 +24,8 @@ export async function proxy(req: NextRequest) {
 
   // ── Redirect already-authenticated users away from login ────────────────
   if (pathname === "/login") {
-    const token = req.cookies.get(COOKIE_NAME)?.value;
-    if (token) {
-      const user = await verifySessionToken(token);
-      if (user) {
-        return NextResponse.redirect(new URL("/dashboard", req.url));
-      }
+    if (await getSession(req.cookies)) {
+      return NextResponse.redirect(new URL("/dashboard", req.url));
     }
   }
 

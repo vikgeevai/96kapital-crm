@@ -9,8 +9,6 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-const CRM_URL = process.env.NEXT_PUBLIC_CRM_URL ?? "";
-const API_KEY = process.env.NEXT_PUBLIC_CRM_API_KEY ?? "";
 
 const STATUS_CONFIG: Record<LeadStatus, { label: string; color: string; bg: string }> = {
   new:       { label: "New",       color: "#10b981", bg: "rgba(16,185,129,0.12)"  },
@@ -91,11 +89,11 @@ export default function LeadsPage() {
     setLoading(true);
     setLoadError(null);
     try {
-      const res = await fetch(`${CRM_URL}/api/leads`, { headers: { "x-api-key": API_KEY } });
+      const res = await fetch("/api/leads");
       if (!res.ok) {
         throw new Error(
           res.status === 401
-            ? "Not authorised — check NEXT_PUBLIC_CRM_API_KEY."
+            ? "Your session has expired — sign in again."
             : `Could not load leads (HTTP ${res.status}).`
         );
       }
@@ -123,9 +121,9 @@ export default function LeadsPage() {
     setLeads(prev => prev.map(l => l.id === id ? { ...l, status } : l));
     if (selectedLead?.id === id) setSelectedLead(prev => prev ? { ...prev, status } : null);
     try {
-      const res = await fetch(`${CRM_URL}/api/leads`, {
+      const res = await fetch("/api/leads", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", "x-api-key": API_KEY },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, status }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -146,9 +144,9 @@ export default function LeadsPage() {
     if (!confirm(msg)) return;
     setIsDeleting(true);
     try {
-      const res = await fetch(`${CRM_URL}/api/leads`, {
+      const res = await fetch("/api/leads", {
         method: "DELETE",
-        headers: { "Content-Type": "application/json", "x-api-key": API_KEY },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
