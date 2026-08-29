@@ -48,9 +48,42 @@ function SidebarContent({ collapsed, onClose }: { collapsed?: boolean; onClose?:
       }
     };
 
+    // Poll only while the tab is actually being looked at.
+    //
+    // This used to run every 60s unconditionally for as long as the tab
+    // existed. A single dashboard left open overnight billed 833 function
+    // invocations in 36 hours, every one of them refreshing a badge nobody was
+    // looking at. Pausing on hidden and refreshing once on return keeps the
+    // badge just as current from the user's point of view.
+    let interval: ReturnType<typeof setInterval> | undefined;
+
+    const start = () => {
+      if (interval !== undefined) return;
+      interval = setInterval(() => void fetchCount(), 60_000);
+    };
+    const stop = () => {
+      if (interval === undefined) return;
+      clearInterval(interval);
+      interval = undefined;
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void fetchCount(); // catch up on whatever arrived while hidden
+        start();
+      } else {
+        stop();
+      }
+    };
+
     void fetchCount();
-    const interval = setInterval(() => void fetchCount(), 60_000); // refresh every 60s
-    return () => clearInterval(interval);
+    if (document.visibilityState === "visible") start();
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      stop();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
   }, []);
 
   const handleLogout = async () => {
