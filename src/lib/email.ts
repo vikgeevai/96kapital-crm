@@ -22,9 +22,41 @@ function getResend(): Resend | null {
 }
 
 const BUSINESS_EMAIL = process.env.BUSINESS_EMAIL ?? "hello@96kapital.com";
-const FROM_EMAIL = process.env.RESEND_FROM
-  ? `96 Kapital CRM <${process.env.RESEND_FROM}>`
+/**
+ * The sender, and the trap in its fallback.
+ *
+ * `onboarding@resend.dev` is Resend's shared test sender, and it can only ever
+ * deliver to the Resend account owner's own address. Everything else comes
+ * back 403.
+ *
+ * That makes this fallback worse than an outage, because it fails
+ * *selectively*. The business notification goes to the owner, so it arrives,
+ * and the dashboard looks healthy — while every customer confirmation to a
+ * real lead is rejected. It ran that way in production: a genuine lead on
+ * 2026-08-28 never received their confirmation, and nothing surfaced it until
+ * deliver() started reporting Resend's response.
+ *
+ * Fix is an env var, not code: set RESEND_FROM to an address on a domain
+ * verified at resend.com/domains.
+ */
+const RESEND_FROM = process.env.RESEND_FROM?.trim();
+const USING_TEST_SENDER = !RESEND_FROM;
+const FROM_EMAIL = RESEND_FROM
+  ? `96 Kapital CRM <${RESEND_FROM}>`
   : 'onboarding@resend.dev';
+
+let warnedTestSender = false;
+function warnTestSender(): void {
+  if (warnedTestSender) return;
+  warnedTestSender = true;
+  console.error(
+    "[email] RESEND_FROM is not set, so mail is going out via Resend's shared " +
+      "test sender (onboarding@resend.dev). That address can ONLY deliver to " +
+      "the Resend account owner — every customer confirmation to a real lead " +
+      "will be rejected 403, while your own notifications still arrive. Set " +
+      "RESEND_FROM to an address on a domain verified at resend.com/domains."
+  );
+}
 const LOGO_URL = process.env.LOGO_URL ?? "";
 const WHATSAPP_NUMBER = process.env.WHATSAPP_NUMBER ?? "";
 
@@ -45,6 +77,8 @@ async function deliver(
   label: string,
   payload: Parameters<Resend["emails"]["send"]>[0]
 ): Promise<boolean> {
+  if (USING_TEST_SENDER) warnTestSender();
+
   const resend = getResend();
   if (!resend) {
     console.error(
