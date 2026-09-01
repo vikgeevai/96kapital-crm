@@ -7,6 +7,24 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Papa from "papaparse";
+/**
+ * xlsx@0.18.5 carries two open high advisories (prototype pollution, ReDoS)
+ * and `npm audit` reports no fix. That is not an oversight to be corrected on
+ * the next pass — it is the end state, and this note exists so nobody spends
+ * an afternoon rediscovering why.
+ *
+ * SheetJS stopped publishing to npm at 0.18.5. The patched releases (0.20.x)
+ * are distributed only from cdn.sheetjs.com, so "fixing" this means installing
+ * a dependency from outside the registry and making every Vercel build depend
+ * on that CDN being reachable.
+ *
+ * Reviewed and accepted (2026-09-01). The exposure is narrow: this parses in
+ * the admin's own browser, on a file they chose, behind a login. It never sees
+ * untrusted input from the public internet and never runs on the server.
+ *
+ * Revisit if this parser is ever moved server-side or fed a file the operator
+ * did not choose — at that point the calculus changes completely.
+ */
 import * as XLSX from "xlsx";
 
 

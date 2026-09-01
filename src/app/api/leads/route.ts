@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import sql, { initDb } from "@/lib/db";
 import { validateApiKey, authorizeDashboardRequest } from "@/lib/api-auth";
 import { corsHeaders } from "@/lib/cors";
+import { createRateLimiter, clientKey } from "@/lib/rate-limit";
 import { sendCustomerEmail, sendBusinessLeadEmail } from "@/lib/email";
 
 // ── Green API WhatsApp admin notification ─────────────────────────────────
@@ -66,6 +67,21 @@ async function notifyAdminWhatsApp(data: {
 
 
 
+/**
+ * Flood cap on inbound leads, per IP.
+ *
+ * Deliberately generous, and here is why: KAPVOY's leads do not arrive from
+ * the visitor's browser — they are forwarded server-to-server from a Vercel
+ * lambda, so EVERY legitimate KAPVOY lead shares a small pool of egress
+ * addresses. A tight limit here would throttle real leads, not spam.
+ *
+ * So this is a runaway backstop, nothing more. The real defence against form
+ * spam is the honeypot on each public form; see lib/antiSpam.ts in the KAPVOY
+ * repo. Thirty in ten minutes is well above anything the real sites produce
+ * and well below what a script does.
+ */
+const floodCap = createRateLimiter(30, 10 * 60 * 1000);
+
 // ── OPTIONS (preflight) ────────────────────────────────────────────────────
 export async function OPTIONS(req: NextRequest) {
   const origin = req.headers.get("origin");
@@ -79,6 +95,18 @@ export async function POST(req: NextRequest) {
 
   if (!validateApiKey(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers });
+  }
+
+  // After the key check, not before: an unauthorised caller should not be able
+  // to consume a legitimate integration's quota by guessing its source IP.
+  const ip = clientKey(req);
+  const flood = floodCap.record(ip);
+  if (flood.limited) {
+    console.warn(`[leads] flood cap hit for ${ip}`);
+    return NextResponse.json(
+      { error: "Too many submissions. Please try again shortly." },
+      { status: 429, headers: { ...headers, "Retry-After": String(flood.retryAfterSeconds) } }
+    );
   }
 
   let body: Record<string, unknown>;

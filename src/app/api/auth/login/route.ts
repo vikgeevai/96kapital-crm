@@ -1,53 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSessionToken, COOKIE_NAME } from "@/lib/auth";
 import { createHash, timingSafeEqual } from "node:crypto";
+import { createRateLimiter, clientKey } from "@/lib/rate-limit";
 
 export const runtime = "nodejs"; // node:crypto
 
 /**
- * Failed-attempt tracking, keyed by client IP.
+ * Failed-attempt lockout, keyed by client IP.
  *
- * Be honest about what this is: serverless memory is per-instance, so an
- * attacker who spreads requests across enough concurrent lambdas gets a fresh
- * counter each time. It raises the cost of a brute force from trivial to
- * tedious; it does not stop a determined one. Real protection is a WAF rule at
- * the edge (Vercel Firewall) or a shared store.
+ * Only FAILURES count, and a success clears the record — so an admin who
+ * fumbles the password a few times and then gets it right is not locked out by
+ * their own success. See lib/rate-limit.ts for what this does and does not
+ * protect against; the short version is that per-instance serverless memory
+ * makes it an approximation, not a control.
  *
- * It is still worth having. This repository is public, so the endpoint, the
- * payload shape and the fact that there is exactly one admin account are all
- * known to anyone who looks — and the only defence before this was a 600ms
- * sleep, which a script does not care about.
+ * Before this existed the only defence was a 600ms sleep, which a script does
+ * not care about.
  */
 const WINDOW_MS = 15 * 60 * 1000;
 const MAX_ATTEMPTS = 8;
-const attempts = new Map<string, { count: number; first: number }>();
-
-function clientKey(req: NextRequest): string {
-  // Vercel sets x-forwarded-for; the left-most entry is the real client.
-  const fwd = req.headers.get("x-forwarded-for");
-  return (fwd?.split(",")[0] ?? req.headers.get("x-real-ip") ?? "unknown").trim();
-}
-
-function isLockedOut(key: string): boolean {
-  const rec = attempts.get(key);
-  if (!rec) return false;
-  if (Date.now() - rec.first > WINDOW_MS) {
-    attempts.delete(key);
-    return false;
-  }
-  return rec.count >= MAX_ATTEMPTS;
-}
-
-function recordFailure(key: string): void {
-  const rec = attempts.get(key);
-  if (!rec || Date.now() - rec.first > WINDOW_MS) {
-    attempts.set(key, { count: 1, first: Date.now() });
-    return;
-  }
-  rec.count += 1;
-  // Bounded so a spray of unique IPs cannot grow this without limit.
-  if (attempts.size > 5000) attempts.clear();
-}
+const failures = createRateLimiter(MAX_ATTEMPTS, WINDOW_MS);
 
 /**
  * Constant-time string comparison.
@@ -66,7 +38,7 @@ export async function POST(req: NextRequest) {
   try {
     const key = clientKey(req);
 
-    if (isLockedOut(key)) {
+    if (failures.check(key).limited) {
       console.warn(`[auth/login] locked out ${key} after ${MAX_ATTEMPTS} failures`);
       return NextResponse.json(
         { error: "Too many attempts. Try again in 15 minutes." },
@@ -92,14 +64,14 @@ export async function POST(req: NextRequest) {
     const passwordMatch = safeEqual(password, adminPassword);
 
     if (!emailMatch || !passwordMatch) {
-      recordFailure(key);
+      failures.record(key);
       await new Promise(r => setTimeout(r, 600));
       return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
     }
 
     // A successful login clears the counter, so a legitimate admin who
     // fumbled a few times is not locked out by their own success.
-    attempts.delete(key);
+    failures.reset(key);
 
     const token = await createSessionToken(adminEmail.toLowerCase());
 
