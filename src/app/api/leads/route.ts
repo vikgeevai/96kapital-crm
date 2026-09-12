@@ -74,9 +74,14 @@ async function notifyAdminWhatsApp(data: {
  * alert with a "NOT SAVED TO CRM" banner). So suppressing here cannot leave a
  * lead unannounced, even during a CRM outage.
  *
- * 'fundwise' is handled separately below and only for email: its site is
- * documented as sending its own admin notification, but that has not been
- * verified for WhatsApp, so its WhatsApp alert is left untouched.
+ * 'fundwise' (KAPVOY Advisory) is deliberately NOT in this set, and must not
+ * be added. It sends its own lead email via Resend, which is why its business
+ * email is suppressed below — but it intentionally sends no WhatsApp of its
+ * own and relies on notifyAdminWhatsApp here. See the comment at
+ * app/api/lead/route.ts:249 in the fundwisesg repo: a second WhatsApp provider
+ * used to live there and was removed because running two meant paying twice.
+ * Adding 'fundwise' here would delete KAPVOY's only staff WhatsApp alert, and
+ * notifyAdminWhatsApp swallows its own errors, so the loss would be silent.
  */
 const SELF_NOTIFYING_SOURCES = new Set(["indian-life-memorial"]);
 // ─────────────────────────────────────────────────────────────────────────
