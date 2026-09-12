@@ -62,6 +62,23 @@ async function notifyAdminWhatsApp(data: {
     )
   );
 }
+
+/**
+ * Sources whose own site already alerts the team for every lead it forwards.
+ * The CRM's copy is a second notification for the same lead, so it is
+ * suppressed for these. The lead is still stored exactly as before — only the
+ * duplicate alert is dropped.
+ *
+ * Safe for indian-life-memorial specifically because that site notifies
+ * unconditionally, including when this CRM rejects the write (it sends the
+ * alert with a "NOT SAVED TO CRM" banner). So suppressing here cannot leave a
+ * lead unannounced, even during a CRM outage.
+ *
+ * 'fundwise' is handled separately below and only for email: its site is
+ * documented as sending its own admin notification, but that has not been
+ * verified for WhatsApp, so its WhatsApp alert is left untouched.
+ */
+const SELF_NOTIFYING_SOURCES = new Set(["indian-life-memorial"]);
 // ─────────────────────────────────────────────────────────────────────────
 
 
@@ -145,6 +162,7 @@ export async function POST(req: NextRequest) {
   ].filter(Boolean).join(" · ");
 
   const source = sourceField || "website";
+  const selfNotifies = SELF_NOTIFYING_SOURCES.has(source);
   const metadataJson = metadata ? JSON.stringify(metadata) : "{}";
 
   try {
@@ -192,7 +210,9 @@ export async function POST(req: NextRequest) {
         // KAPVOY Advisory (source 'fundwise') already sends its own admin
         // notification from its own site — this CRM's copy is a duplicate
         // for that source only. Every other source still gets it as before.
-        source === 'fundwise' ? Promise.resolve() : sendBusinessLeadEmail({
+        // SELF_NOTIFYING_SOURCES covers the same case for sites that alert on
+        // every channel themselves.
+        source === 'fundwise' || selfNotifies ? Promise.resolve() : sendBusinessLeadEmail({
           name, email: email ?? "", phone,
           address: address ?? undefined,
           service,
@@ -216,12 +236,18 @@ export async function POST(req: NextRequest) {
     // can be torn down before Green API is contacted, making the alert
     // arrive intermittently. notifyAdminWhatsApp swallows its own errors, so
     // awaiting still cannot fail the lead write.
-    await notifyAdminWhatsApp({
-      name, phone,
-      service:        service        || undefined,
-      source:         source         || undefined,
-      estimated_cost: estimated_cost || undefined,
-    }).catch((err) => console.error("[WhatsApp notify]", err));
+    if (selfNotifies) {
+      // Logged rather than silent: "no WhatsApp line" should never be
+      // ambiguous between suppressed-on-purpose and quietly broken.
+      console.log(`[WhatsApp notify] skipped — ${source} sends its own staff alert`);
+    } else {
+      await notifyAdminWhatsApp({
+        name, phone,
+        service:        service        || undefined,
+        source:         source         || undefined,
+        estimated_cost: estimated_cost || undefined,
+      }).catch((err) => console.error("[WhatsApp notify]", err));
+    }
 
     return NextResponse.json(
       { success: true, id: lead.id, customerEmail: customerEmailSent, businessEmail: businessEmailSent },
