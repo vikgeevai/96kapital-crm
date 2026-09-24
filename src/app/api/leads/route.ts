@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import sql, { initDb } from "@/lib/db";
 import { validateApiKey, authorizeDashboardRequest } from "@/lib/api-auth";
 import { corsHeaders } from "@/lib/cors";
-import { getSourceConfig } from "@/lib/sources";
+import { getSourceConfig, normaliseSource } from "@/lib/sources";
 import { createRateLimiter, clientKey } from "@/lib/rate-limit";
 import { sendCustomerEmail, sendBusinessLeadEmail, LEAD_COPY_CONFIGURED } from "@/lib/email";
 
@@ -79,13 +79,13 @@ async function notifyAdminWhatsApp(data: {
  * alert with a "NOT SAVED TO CRM" banner). So suppressing here cannot leave a
  * lead unannounced, even during a CRM outage.
  *
- * 'fundwise' (KAPVOY Advisory) is deliberately NOT in this set, and must not
+ * 'kapvoy' (KAPVOY Advisory) is deliberately NOT in this set, and must not
  * be added. It sends its own lead email via Resend, which is why its business
  * email is suppressed below — but it intentionally sends no WhatsApp of its
  * own and relies on notifyAdminWhatsApp here. See the comment at
  * app/api/lead/route.ts:249 in the fundwisesg repo: a second WhatsApp provider
  * used to live there and was removed because running two meant paying twice.
- * Adding 'fundwise' here would delete KAPVOY's only staff WhatsApp alert, and
+ * Adding 'kapvoy' here would delete KAPVOY's only staff WhatsApp alert, and
  * notifyAdminWhatsApp swallows its own errors, so the loss would be silent.
  */
 const SELF_NOTIFYING_SOURCES = new Set(["indian-life-memorial"]);
@@ -171,9 +171,14 @@ export async function POST(req: NextRequest) {
     death_cert_no && `Death cert: ${death_cert_no}`,
   ].filter(Boolean).join(" · ");
 
-  const source = sourceField || "website";
+  // Normalised on the way IN, so the row is written with the current key even
+  // while a client is still sending the legacy one. That is what lets the
+  // KAPVOY site be updated after this rather than in lockstep with it.
+  const source = normaliseSource(sourceField) || "website";
   const selfNotifies = SELF_NOTIFYING_SOURCES.has(source);
-  const skipsBusinessEmail = source === 'fundwise' || selfNotifies;
+  // 'source' is normalised above, so a lead that arrived as 'fundwise'
+  // matches here as 'kapvoy'. Both eras of the KAPVOY site behave the same.
+  const skipsBusinessEmail = source === 'kapvoy' || selfNotifies;
   const metadataJson = metadata ? JSON.stringify(metadata) : "{}";
 
   try {
@@ -219,13 +224,13 @@ export async function POST(req: NextRequest) {
           estimatedCost: estimated_cost ?? "",
           productImageUrl: selected_coffin_image,
         }) : Promise.resolve(),
-        // KAPVOY Advisory (source 'fundwise') already sends its own admin
+        // KAPVOY Advisory (source 'kapvoy') already sends its own admin
         // notification from its own site — this CRM's copy is a duplicate
         // for that source only. Every other source still gets it as before.
         // SELF_NOTIFYING_SOURCES covers the same case for sites that alert on
         // every channel themselves.
         //
-        // 'fundwise' is no longer skipped outright: it sends copyOnly, which
+        // 'kapvoy' is no longer skipped outright: it sends copyOnly, which
         // goes to LEAD_COPY_EMAIL instead of BUSINESS_EMAIL. KAPVOY's team
         // alert still comes from KAPVOY's own site, so nothing is duplicated
         // — this is a separate address that wanted KAPVOY leads specifically.
@@ -240,7 +245,7 @@ export async function POST(req: NextRequest) {
           notes: notes || undefined,
           estimatedCost: estimated_cost ?? "",
           productImageUrl: selected_coffin_image,
-        }, { copyOnly: source === 'fundwise' }),
+        }, { copyOnly: source === 'kapvoy' }),
       ]);
       // deliver() resolves false on an API rejection rather than throwing, so
       // check the value, not just whether the promise settled.
@@ -252,7 +257,7 @@ export async function POST(req: NextRequest) {
       // a caller the team was alerted when it was not.
       const bizOk = bizRes.status === "fulfilled" && bizRes.value === true;
       businessEmailSent = !skipsBusinessEmail && bizOk;
-      leadCopySent = source === 'fundwise' && LEAD_COPY_CONFIGURED && bizOk;
+      leadCopySent = source === 'kapvoy' && LEAD_COPY_CONFIGURED && bizOk;
     } else {
       console.warn("[email] RESEND_API_KEY not set — no emails sent for this lead");
     }

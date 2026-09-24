@@ -9,10 +9,35 @@ export interface SourceConfig {
   metadataColumns: Array<{ key: string; label: string }>;
 }
 
+/**
+ * Legacy source keys, mapped to the key in use now.
+ *
+ * KAPVOY leads were stored as 'fundwise' from the FundWise era. The rows are
+ * being migrated to 'kapvoy', and until every one of them is, both values are
+ * in the database at once — so everything that reads a source runs it through
+ * normaliseSource() first and sees only the new key.
+ *
+ * This entry stays until the migration is confirmed complete. Removing it
+ * early sends every unmigrated row to the unknown-source fallback, which
+ * strips its label AND its metadata columns.
+ */
+const SOURCE_ALIASES: Record<string, string> = {
+  fundwise: "kapvoy",
+};
+
+/**
+ * The canonical key for a stored source value.
+ *
+ * Call this on anything read from the database or arriving over the API,
+ * before comparing, grouping or looking up config.
+ */
+export function normaliseSource(source: string | null | undefined): string {
+  const s = (source ?? "").trim();
+  return SOURCE_ALIASES[s] ?? s;
+}
+
 export const SOURCE_CONFIGS: Record<string, SourceConfig> = {
-  // Key stays "fundwise" — it is the value stored on every existing lead row.
-  // The label is what the dashboard displays.
-  fundwise: {
+  kapvoy: {
     label: "KAPVOY Advisory",
     color: "#2D6A34",
     metadataColumns: [
@@ -52,10 +77,11 @@ export const SOURCE_CONFIGS: Record<string, SourceConfig> = {
   },
 };
 
-/** Returns config for a source, with a sensible fallback for unknown sources. */
+/** Returns config for a source, with a sensible fallback for unknown sources.
+ *  Normalises first, so a legacy key still resolves to its real config. */
 export function getSourceConfig(source: string): SourceConfig {
   return (
-    SOURCE_CONFIGS[source] ?? {
+    SOURCE_CONFIGS[normaliseSource(source)] ?? {
       label: source ?? "Unknown",
       color: "#6b7280",
       metadataColumns: [],

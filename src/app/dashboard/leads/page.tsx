@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { PageShell } from "@/components/dashboard/PageShell";
 import { LeadStatus } from "@/lib/mock-data";
-import { getSourceConfig, SOURCE_CONFIGS } from "@/lib/sources";
+import { getSourceConfig, SOURCE_CONFIGS, normaliseSource } from "@/lib/sources";
 import {
   Search, X, Phone, Mail, MapPin,
   MessageCircle, Layers, Trash2,
@@ -171,7 +171,10 @@ export default function LeadsPage() {
   // Unique sources present in the data, sorted by lead count descending
   const uniqueSources = useMemo(() => {
     const counts: Record<string, number> = {};
-    leads.forEach(l => { counts[l.source] = (counts[l.source] ?? 0) + 1; });
+    // Grouped by the normalised key. While the migration is in flight the
+    // table holds both 'fundwise' and 'kapvoy', and grouping on the raw
+    // value would show two filter chips both reading "KAPVOY Advisory".
+    leads.forEach(l => { const k = normaliseSource(l.source); counts[k] = (counts[k] ?? 0) + 1; });
     return Object.entries(counts)
       .sort((a, b) => b[1] - a[1])
       .map(([src]) => src);
@@ -189,7 +192,7 @@ export default function LeadsPage() {
       || (l.phone ?? "").includes(q)
       || (l.service ?? "").toLowerCase().includes(q);
     const matchStatus = filterStatus === "all" || l.status === filterStatus;
-    const matchSource = filterSource === "all" || l.source === filterSource;
+    const matchSource = filterSource === "all" || normaliseSource(l.source) === filterSource;
     return matchSearch && matchStatus && matchSource;
   }), [leads, search, filterStatus, filterSource]);
 
@@ -197,7 +200,7 @@ export default function LeadsPage() {
     s === "all" ? leads.length : leads.filter(l => l.status === s).length;
 
   const countBySource = (src: string) =>
-    src === "all" ? leads.length : leads.filter(l => l.source === src).length;
+    src === "all" ? leads.length : leads.filter(l => normaliseSource(l.source) === src).length;
 
   const waLink = (phone: string, name: string) =>
     `https://wa.me/${phone.replace(/\D/g, "")}?text=${encodeURIComponent(`Hi ${name}, thanks for your enquiry. We would love to help — are you available for a quick call?`)}`;
