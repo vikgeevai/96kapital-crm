@@ -220,12 +220,13 @@ export async function POST(req: NextRequest) {
         // SELF_NOTIFYING_SOURCES covers the same case for sites that alert on
         // every channel themselves.
         //
-        // This is now always CALLED, where it used to be skipped outright.
-        // For a self-notifying source it sends copyOnly, so LEAD_COPY_EMAIL
-        // still receives every lead while BUSINESS_EMAIL stays suppressed —
-        // which is the whole point of the suppression. With no copy address
-        // configured, copyOnly sends nothing, exactly as before.
-        sendBusinessLeadEmail({
+        // 'fundwise' is no longer skipped outright: it sends copyOnly, which
+        // goes to LEAD_COPY_EMAIL instead of BUSINESS_EMAIL. KAPVOY's team
+        // alert still comes from KAPVOY's own site, so nothing is duplicated
+        // — this is a separate address that wanted KAPVOY leads specifically.
+        // With LEAD_COPY_EMAIL unset, copyOnly sends nothing at all, which is
+        // exactly the previous behaviour.
+        selfNotifies ? Promise.resolve() : sendBusinessLeadEmail({
           name, email: email ?? "", phone,
           address: address ?? undefined,
           service,
@@ -234,19 +235,19 @@ export async function POST(req: NextRequest) {
           notes: notes || undefined,
           estimatedCost: estimated_cost ?? "",
           productImageUrl: selected_coffin_image,
-        }, { copyOnly: skipsBusinessEmail }),
+        }, { copyOnly: source === 'fundwise' }),
       ]);
       // deliver() resolves false on an API rejection rather than throwing, so
       // check the value, not just whether the promise settled.
       customerEmailSent = custRes.status === "fulfilled" && custRes.value === true;
 
       // One send, two facts, kept apart on purpose. businessEmailSent must go
-      // on meaning "the business inbox was notified" — for a self-notifying
-      // source that is false however well the copy went, and reporting
-      // otherwise would tell a caller the team was alerted when it was not.
+      // on meaning "the business inbox was notified" — for KAPVOY that is
+      // false however well the copy went, and reporting otherwise would tell
+      // a caller the team was alerted when it was not.
       const bizOk = bizRes.status === "fulfilled" && bizRes.value === true;
       businessEmailSent = !skipsBusinessEmail && bizOk;
-      leadCopySent = LEAD_COPY_CONFIGURED && bizOk;
+      leadCopySent = source === 'fundwise' && LEAD_COPY_CONFIGURED && bizOk;
     } else {
       console.warn("[email] RESEND_API_KEY not set — no emails sent for this lead");
     }

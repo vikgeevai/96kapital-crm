@@ -24,16 +24,19 @@ function getResend(): Resend | null {
 const BUSINESS_EMAIL = process.env.BUSINESS_EMAIL ?? "hello@96kapital.com";
 
 /**
- * A second address that receives a copy of EVERY lead.
+ * A second address that receives a copy of KAPVOY (source 'fundwise') leads.
+ *
+ * Only that source. Nothing else in the CRM is copied here — see the call
+ * site in api/leads/route.ts.
  *
  * Env var rather than a literal because this repository is public, and the
  * address feeds a tool rather than a person — publishing it in source would
  * hand it to anyone reading the repo, and git history would keep it there
  * after any later removal.
  *
- * Unset is a supported state: nothing is BCC'd and nothing is logged as
+ * Unset is a supported state: no copy is sent and nothing is logged as
  * broken. That matters because the copy is additive — it must never be able
- * to stop the business alert going out.
+ * to stop a business alert going out.
  */
 const LEAD_COPY_EMAIL = process.env.LEAD_COPY_EMAIL?.trim() || undefined;
 
@@ -284,14 +287,11 @@ export async function sendBusinessLeadEmail(
     productImageUrl?: string;
   },
   /**
-   * copyOnly: this source notifies its own team, so BUSINESS_EMAIL is
-   * deliberately skipped (see SELF_NOTIFYING_SOURCES in api/leads/route.ts)
-   * and the mail exists solely to give LEAD_COPY_EMAIL its copy.
+   * copyOnly: send to LEAD_COPY_EMAIL instead of BUSINESS_EMAIL.
    *
-   * Without this the copy address would silently miss KAPVOY and Indian Life
-   * Memorial leads — the two sources whose business alert is suppressed, and
-   * between them most of the volume. A plain BCC cannot fix that, because
-   * there is no mail to BCC.
+   * Used for KAPVOY leads only. That source's business alert is deliberately
+   * suppressed — KAPVOY's own site alerts its team (see 70220a2) — so there
+   * is no mail to CC or BCC, and the copy has to be its own send.
    */
   opts: { copyOnly?: boolean } = {}
 ) {
@@ -425,9 +425,6 @@ Service Details:
   return deliver(opts.copyOnly ? "lead copy" : "business lead alert", {
     from: FROM_EMAIL,
     to: opts.copyOnly ? LEAD_COPY_EMAIL! : BUSINESS_EMAIL,
-    // BCC, not CC: the copy address is invisible to anyone who receives or
-    // forwards the business alert.
-    bcc: opts.copyOnly ? undefined : LEAD_COPY_EMAIL,
     subject: `New Lead: ${data.name} — ${data.service} (${data.estimatedCost})`,
     html,
     text,
