@@ -89,6 +89,22 @@ async function notifyAdminWhatsApp(data: {
  * notifyAdminWhatsApp swallows its own errors, so the loss would be silent.
  */
 const SELF_NOTIFYING_SOURCES = new Set(["indian-life-memorial"]);
+
+/**
+ * Sources whose leads are copied to LEAD_COPY_EMAIL.
+ *
+ * A set rather than a comparison, because this is now a list that grows: the
+ * address feeds an assistant that wants leads from specific sites, not from
+ * every tenant of this CRM. Adding a site is one entry here.
+ *
+ * Note what membership implies. A source in this set AND in
+ * SELF_NOTIFYING_SOURCES (or otherwise suppressed) gets the copy as its own
+ * email. A source in this set that still receives a business alert gets the
+ * copy BCC'd onto it instead — see sendBusinessLeadEmail. Either way the
+ * address receives one email per lead; the difference is only whether anyone
+ * else is on it.
+ */
+const LEAD_COPY_SOURCES = new Set(["kapvoy"]);
 // ─────────────────────────────────────────────────────────────────────────
 
 
@@ -179,6 +195,7 @@ export async function POST(req: NextRequest) {
   // 'source' is normalised above, so a lead that arrived as 'fundwise'
   // matches here as 'kapvoy'. Both eras of the KAPVOY site behave the same.
   const skipsBusinessEmail = source === 'kapvoy' || selfNotifies;
+  const wantsLeadCopy = LEAD_COPY_SOURCES.has(source);
   const metadataJson = metadata ? JSON.stringify(metadata) : "{}";
 
   try {
@@ -245,7 +262,7 @@ export async function POST(req: NextRequest) {
           notes: notes || undefined,
           estimatedCost: estimated_cost ?? "",
           productImageUrl: selected_coffin_image,
-        }, { copyOnly: source === 'kapvoy' }),
+        }, { copy: wantsLeadCopy, businessSuppressed: skipsBusinessEmail }),
       ]);
       // deliver() resolves false on an API rejection rather than throwing, so
       // check the value, not just whether the promise settled.
@@ -257,7 +274,7 @@ export async function POST(req: NextRequest) {
       // a caller the team was alerted when it was not.
       const bizOk = bizRes.status === "fulfilled" && bizRes.value === true;
       businessEmailSent = !skipsBusinessEmail && bizOk;
-      leadCopySent = source === 'kapvoy' && LEAD_COPY_CONFIGURED && bizOk;
+      leadCopySent = wantsLeadCopy && LEAD_COPY_CONFIGURED && bizOk;
     } else {
       console.warn("[email] RESEND_API_KEY not set — no emails sent for this lead");
     }

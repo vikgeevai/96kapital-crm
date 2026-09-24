@@ -287,13 +287,23 @@ export async function sendBusinessLeadEmail(
     productImageUrl?: string;
   },
   /**
-   * copyOnly: send to LEAD_COPY_EMAIL instead of BUSINESS_EMAIL.
+   * Who receives this, beyond BUSINESS_EMAIL.
    *
-   * Used for KAPVOY leads only. That source's business alert is deliberately
-   * suppressed — KAPVOY's own site alerts its team (see 70220a2) — so there
-   * is no mail to CC or BCC, and the copy has to be its own send.
+   *   copy               this source's leads go to LEAD_COPY_EMAIL too
+   *   businessSuppressed BUSINESS_EMAIL is skipped for this source
+   *
+   * The two combine into the only three states that exist:
+   *
+   *   copy + suppressed   -> LEAD_COPY_EMAIL is the sole recipient. There is
+   *                          no business alert to attach to, so the copy has
+   *                          to be its own send. This is KAPVOY.
+   *   copy + not          -> BUSINESS_EMAIL, with LEAD_COPY_EMAIL BCC'd.
+   *   neither            -> BUSINESS_EMAIL alone, as it always was.
+   *
+   * Callers must not pass businessSuppressed without copy: that asks for an
+   * email with no recipient at all, and it returns false rather than sending.
    */
-  opts: { copyOnly?: boolean } = {}
+  opts: { copy?: boolean; businessSuppressed?: boolean } = {}
 ) {
   const html = `
 <!DOCTYPE html>
@@ -418,13 +428,20 @@ Service Details:
 
 -- 96 Kapital CRM CRM`;
 
-  // copyOnly with nothing configured has no recipient at all — not an error,
-  // just nothing to do. Returning false keeps it out of the "sent" tally.
-  if (opts.copyOnly && !LEAD_COPY_EMAIL) return false;
+  const wantsCopy = Boolean(opts.copy) && Boolean(LEAD_COPY_EMAIL);
+  // Suppressed with no copy to send leaves no recipient at all — not an
+  // error, just nothing to do. Returning false keeps it out of the "sent"
+  // tally rather than reporting a delivery that never happened.
+  if (opts.businessSuppressed && !wantsCopy) return false;
 
-  return deliver(opts.copyOnly ? "lead copy" : "business lead alert", {
+  const copyIsSoleRecipient = wantsCopy && Boolean(opts.businessSuppressed);
+
+  return deliver(copyIsSoleRecipient ? "lead copy" : "business lead alert", {
     from: FROM_EMAIL,
-    to: opts.copyOnly ? LEAD_COPY_EMAIL! : BUSINESS_EMAIL,
+    to: copyIsSoleRecipient ? LEAD_COPY_EMAIL! : BUSINESS_EMAIL,
+    // BCC rather than CC: the copy address is invisible to anyone who
+    // receives or forwards the business alert.
+    bcc: wantsCopy && !copyIsSoleRecipient ? LEAD_COPY_EMAIL : undefined,
     subject: `New Lead: ${data.name} — ${data.service} (${data.estimatedCost})`,
     html,
     text,
