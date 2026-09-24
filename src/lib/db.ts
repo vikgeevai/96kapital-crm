@@ -43,43 +43,4 @@ export async function initDb() {
   await sql`
     ALTER TABLE leads ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'
   `;
-
-  await migrateFundwiseSource();
-}
-
-/**
- * ONE-TIME DATA MIGRATION — remove once the logs confirm it has run.
- *
- * KAPVOY leads were stored under 'fundwise' from the FundWise era. The key is
- * now 'kapvoy' (see lib/sources.ts), and this brings the existing rows across.
- *
- * Idempotent, which is what makes it safe on every cold start: once the rows
- * are renamed nothing matches and it is a no-op, exactly like the ADD COLUMN
- * IF NOT EXISTS above. It logs only when it actually changes something, so a
- * line in the Vercel logs means it ran and tells you how many rows moved.
- *
- * Wrapped, and deliberately so. initDb() is awaited before every lead INSERT;
- * if this threw, a failed migration would take the whole POST down with it and
- * the lead would be lost. A tidy-up must never be able to cost a lead, so a
- * failure here is loud in the logs and otherwise ignored — sources.ts still
- * maps 'fundwise' forward, so unmigrated rows keep their label and all four
- * metadata columns either way.
- */
-async function migrateFundwiseSource() {
-  try {
-    const moved = await sql`
-      UPDATE leads SET source = 'kapvoy' WHERE source = 'fundwise' RETURNING id
-    `;
-    if (moved.length > 0) {
-      console.log(
-        `[db] source migration: moved ${moved.length} lead(s) from 'fundwise' to 'kapvoy'`
-      );
-    }
-  } catch (err) {
-    console.error(
-      "[db] source migration FAILED — leads are unaffected and still readable " +
-      "via the 'fundwise' alias in lib/sources.ts:",
-      err
-    );
-  }
 }
