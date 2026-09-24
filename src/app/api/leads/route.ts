@@ -3,7 +3,7 @@ import sql, { initDb } from "@/lib/db";
 import { validateApiKey, authorizeDashboardRequest } from "@/lib/api-auth";
 import { corsHeaders } from "@/lib/cors";
 import { createRateLimiter, clientKey } from "@/lib/rate-limit";
-import { sendCustomerEmail, sendBusinessLeadEmail } from "@/lib/email";
+import { sendCustomerEmail, sendBusinessLeadEmail, LEAD_COPY_CONFIGURED } from "@/lib/email";
 
 // ── Green API WhatsApp admin notification ─────────────────────────────────
 const GREEN_API_URL        = process.env.GREEN_API_URL ?? "";
@@ -168,6 +168,7 @@ export async function POST(req: NextRequest) {
 
   const source = sourceField || "website";
   const selfNotifies = SELF_NOTIFYING_SOURCES.has(source);
+  const skipsBusinessEmail = source === 'fundwise' || selfNotifies;
   const metadataJson = metadata ? JSON.stringify(metadata) : "{}";
 
   try {
@@ -199,6 +200,7 @@ export async function POST(req: NextRequest) {
     // Send emails (non-blocking — don't let email failure block lead storage)
     let customerEmailSent = false;
     let businessEmailSent = false;
+    let leadCopySent = false;
     if (process.env.RESEND_API_KEY) {
       const planDetails = [planning_type, arrangement_type, disposition_type, wake_duration]
         .filter(Boolean).join(" · ") || undefined;
@@ -217,7 +219,13 @@ export async function POST(req: NextRequest) {
         // for that source only. Every other source still gets it as before.
         // SELF_NOTIFYING_SOURCES covers the same case for sites that alert on
         // every channel themselves.
-        source === 'fundwise' || selfNotifies ? Promise.resolve() : sendBusinessLeadEmail({
+        //
+        // This is now always CALLED, where it used to be skipped outright.
+        // For a self-notifying source it sends copyOnly, so LEAD_COPY_EMAIL
+        // still receives every lead while BUSINESS_EMAIL stays suppressed —
+        // which is the whole point of the suppression. With no copy address
+        // configured, copyOnly sends nothing, exactly as before.
+        sendBusinessLeadEmail({
           name, email: email ?? "", phone,
           address: address ?? undefined,
           service,
@@ -226,12 +234,19 @@ export async function POST(req: NextRequest) {
           notes: notes || undefined,
           estimatedCost: estimated_cost ?? "",
           productImageUrl: selected_coffin_image,
-        }),
+        }, { copyOnly: skipsBusinessEmail }),
       ]);
       // deliver() resolves false on an API rejection rather than throwing, so
       // check the value, not just whether the promise settled.
       customerEmailSent = custRes.status === "fulfilled" && custRes.value === true;
-      businessEmailSent = bizRes.status === "fulfilled" && bizRes.value === true;
+
+      // One send, two facts, kept apart on purpose. businessEmailSent must go
+      // on meaning "the business inbox was notified" — for a self-notifying
+      // source that is false however well the copy went, and reporting
+      // otherwise would tell a caller the team was alerted when it was not.
+      const bizOk = bizRes.status === "fulfilled" && bizRes.value === true;
+      businessEmailSent = !skipsBusinessEmail && bizOk;
+      leadCopySent = LEAD_COPY_CONFIGURED && bizOk;
     } else {
       console.warn("[email] RESEND_API_KEY not set — no emails sent for this lead");
     }
@@ -255,7 +270,7 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json(
-      { success: true, id: lead.id, customerEmail: customerEmailSent, businessEmail: businessEmailSent },
+      { success: true, id: lead.id, customerEmail: customerEmailSent, businessEmail: businessEmailSent, leadCopy: leadCopySent },
       { status: 201, headers }
     );
   } catch (err) {

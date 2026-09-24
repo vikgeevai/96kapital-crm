@@ -22,6 +22,23 @@ function getResend(): Resend | null {
 }
 
 const BUSINESS_EMAIL = process.env.BUSINESS_EMAIL ?? "hello@96kapital.com";
+
+/**
+ * A second address that receives a copy of EVERY lead.
+ *
+ * Env var rather than a literal because this repository is public, and the
+ * address feeds a tool rather than a person — publishing it in source would
+ * hand it to anyone reading the repo, and git history would keep it there
+ * after any later removal.
+ *
+ * Unset is a supported state: nothing is BCC'd and nothing is logged as
+ * broken. That matters because the copy is additive — it must never be able
+ * to stop the business alert going out.
+ */
+const LEAD_COPY_EMAIL = process.env.LEAD_COPY_EMAIL?.trim() || undefined;
+
+/** Whether a copy recipient is configured, for honest reporting by callers. */
+export const LEAD_COPY_CONFIGURED = Boolean(LEAD_COPY_EMAIL);
 /**
  * The sender, and the trap in its fallback.
  *
@@ -253,18 +270,31 @@ Our team will reach out within 5 minutes.${WHATSAPP_NUMBER ? ` Need help now? Wh
 }
 
 // ── Business owner lead notification ──────────────────────────────────────
-export async function sendBusinessLeadEmail(data: {
-  name: string;
-  email: string;
-  phone: string;
-  address?: string;
-  service: string;
-  planDetails?: string;
-  location?: string;
-  notes?: string;
-  estimatedCost: string;
-  productImageUrl?: string;
-}) {
+export async function sendBusinessLeadEmail(
+  data: {
+    name: string;
+    email: string;
+    phone: string;
+    address?: string;
+    service: string;
+    planDetails?: string;
+    location?: string;
+    notes?: string;
+    estimatedCost: string;
+    productImageUrl?: string;
+  },
+  /**
+   * copyOnly: this source notifies its own team, so BUSINESS_EMAIL is
+   * deliberately skipped (see SELF_NOTIFYING_SOURCES in api/leads/route.ts)
+   * and the mail exists solely to give LEAD_COPY_EMAIL its copy.
+   *
+   * Without this the copy address would silently miss KAPVOY and Indian Life
+   * Memorial leads — the two sources whose business alert is suppressed, and
+   * between them most of the volume. A plain BCC cannot fix that, because
+   * there is no mail to BCC.
+   */
+  opts: { copyOnly?: boolean } = {}
+) {
   const html = `
 <!DOCTYPE html>
 <html lang="en">
@@ -388,9 +418,16 @@ Service Details:
 
 -- 96 Kapital CRM CRM`;
 
-  return deliver("business lead alert", {
+  // copyOnly with nothing configured has no recipient at all — not an error,
+  // just nothing to do. Returning false keeps it out of the "sent" tally.
+  if (opts.copyOnly && !LEAD_COPY_EMAIL) return false;
+
+  return deliver(opts.copyOnly ? "lead copy" : "business lead alert", {
     from: FROM_EMAIL,
-    to: BUSINESS_EMAIL,
+    to: opts.copyOnly ? LEAD_COPY_EMAIL! : BUSINESS_EMAIL,
+    // BCC, not CC: the copy address is invisible to anyone who receives or
+    // forwards the business alert.
+    bcc: opts.copyOnly ? undefined : LEAD_COPY_EMAIL,
     subject: `New Lead: ${data.name} — ${data.service} (${data.estimatedCost})`,
     html,
     text,
