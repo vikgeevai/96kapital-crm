@@ -91,6 +91,24 @@ async function notifyAdminWhatsApp(data: {
 const SELF_NOTIFYING_SOURCES = new Set(["indian-life-memorial"]);
 
 /**
+ * Sources this CRM sends NO staff alert for — no business email, no WhatsApp.
+ *
+ * Deliberately separate from SELF_NOTIFYING_SOURCES, which it would have been
+ * easy to reuse. That set is safe precisely because those sites alert their
+ * own team unconditionally, even when this CRM rejects the write. These do
+ * not, so the safety argument does not carry over and the two must not be
+ * conflated.
+ *
+ * buddy-broker (buddybroker.com.sg) is quiet by explicit request: its leads
+ * reach LEAD_COPY_EMAIL and nothing else. Be clear about what that costs —
+ * that one email is the ONLY notification for those leads, so if Resend
+ * rejects it or the recipient inbox breaks, the lead sits in the dashboard
+ * unannounced. deliver() logs a rejection loudly and the POST reports
+ * leadCopy:false, which is the only warning there will be.
+ */
+const NO_STAFF_ALERT_SOURCES = new Set(["buddy-broker"]);
+
+/**
  * Sources whose leads are copied to LEAD_COPY_EMAIL.
  *
  * A set rather than a comparison, because this is now a list that grows: the
@@ -104,7 +122,7 @@ const SELF_NOTIFYING_SOURCES = new Set(["indian-life-memorial"]);
  * address receives one email per lead; the difference is only whether anyone
  * else is on it.
  */
-const LEAD_COPY_SOURCES = new Set(["kapvoy"]);
+const LEAD_COPY_SOURCES = new Set(["kapvoy", "buddy-broker"]);
 // ─────────────────────────────────────────────────────────────────────────
 
 
@@ -194,7 +212,10 @@ export async function POST(req: NextRequest) {
   const selfNotifies = SELF_NOTIFYING_SOURCES.has(source);
   // 'source' is normalised above, so a lead that arrived as 'fundwise'
   // matches here as 'kapvoy'. Both eras of the KAPVOY site behave the same.
-  const skipsBusinessEmail = source === 'kapvoy' || selfNotifies;
+  // Covers both reasons for silence. kapvoy is in NEITHER set, so it keeps its
+  // WhatsApp — see the note above SELF_NOTIFYING_SOURCES for why that matters.
+  const suppressesStaffAlerts = selfNotifies || NO_STAFF_ALERT_SOURCES.has(source);
+  const skipsBusinessEmail = source === 'kapvoy' || suppressesStaffAlerts;
   const wantsLeadCopy = LEAD_COPY_SOURCES.has(source);
   const metadataJson = metadata ? JSON.stringify(metadata) : "{}";
 
@@ -253,7 +274,10 @@ export async function POST(req: NextRequest) {
         // — this is a separate address that wanted KAPVOY leads specifically.
         // With LEAD_COPY_EMAIL unset, copyOnly sends nothing at all, which is
         // exactly the previous behaviour.
-        selfNotifies ? Promise.resolve() : sendBusinessLeadEmail({
+        // Skipped entirely only when there is no recipient at all. A source
+        // with staff alerts off but a copy wanted still sends — the copy is
+        // the whole point.
+        suppressesStaffAlerts && !wantsLeadCopy ? Promise.resolve() : sendBusinessLeadEmail({
           name, email: email ?? "", phone,
           address: address ?? undefined,
           service,
@@ -284,10 +308,10 @@ export async function POST(req: NextRequest) {
     // can be torn down before Green API is contacted, making the alert
     // arrive intermittently. notifyAdminWhatsApp swallows its own errors, so
     // awaiting still cannot fail the lead write.
-    if (selfNotifies) {
+    if (suppressesStaffAlerts) {
       // Logged rather than silent: "no WhatsApp line" should never be
       // ambiguous between suppressed-on-purpose and quietly broken.
-      console.log(`[WhatsApp notify] skipped — ${source} sends its own staff alert`);
+      console.log(`[WhatsApp notify] skipped — no CRM staff alert for ${source}`);
     } else {
       await notifyAdminWhatsApp({
         name, phone,

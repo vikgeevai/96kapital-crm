@@ -47,6 +47,19 @@ export const SOURCE_CONFIGS: Record<string, SourceConfig> = {
       { key: "business_structure", label: "Biz Structure"   },
     ],
   },
+  // buddybroker.com.sg — a second business-financing funnel. Its chat asks the
+  // same four things the KAPVOY quiz does, so it gets the same four columns and
+  // the two read identically side by side in the leads table.
+  "buddy-broker": {
+    label: "Buddy Broker",
+    color: "#7C3AED",
+    metadataColumns: [
+      { key: "financing_type",     label: "Financing Type"  },
+      { key: "funding_amount",     label: "Funding Amount"  },
+      { key: "operating_time",     label: "Time in Biz"     },
+      { key: "business_structure", label: "Biz Structure"   },
+    ],
+  },
   "instagram-ads": {
     label: "Instagram Ads",
     color: "#E1306C",
