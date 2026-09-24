@@ -1,4 +1,5 @@
 "use client";
+import { getSourceConfig } from "@/lib/sources";
 import { useState, useEffect } from "react";
 import { PageShell } from "@/components/dashboard/PageShell";
 import { motion } from "framer-motion";
@@ -201,7 +202,7 @@ export default function AIPage() {
     topSource && {
       type: "positive" as const,
       icon: Star,
-      headline: `"${topSource.source}" is your #1 lead source with ${topSource.count} leads`,
+      headline: `"${getSourceConfig(topSource.source).label}" is your #1 lead source with ${topSource.count} leads`,
       detail: "Double down on this channel. Consider increasing budget or referral incentives here.",
       metric: `${topSource.count} leads`,
     },

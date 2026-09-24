@@ -1,4 +1,5 @@
 "use client";
+import { getSourceConfig } from "@/lib/sources";
 import { useState, useMemo, useEffect } from "react";
 import {
   Search, Filter, Download, ChevronDown, MoreHorizontal,
@@ -291,7 +292,7 @@ export function LeadsTable() {
                     className="text-xs px-2 py-0.5 rounded-md"
                     style={{ background: "rgba(255,255,255,0.04)", color: "var(--text-muted)" }}
                   >
-                    {lead.source}
+                    {getSourceConfig(lead.source).label}
                   </span>
                   {lead.responseTime && (
                     <span className="flex items-center gap-1 text-xs" style={{ color: "var(--text-muted)" }}>
@@ -428,7 +429,7 @@ export function LeadsTable() {
                       className="text-xs px-2 py-1 rounded-md font-medium"
                       style={{ background: "rgba(255,255,255,0.05)", color: "var(--text-secondary)" }}
                     >
-                      {lead.source}
+                      {getSourceConfig(lead.source).label}
                     </span>
                   </td>
 

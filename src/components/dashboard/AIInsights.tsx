@@ -1,4 +1,5 @@
 "use client";
+import { getSourceConfig } from "@/lib/sources";
 import { useState, useEffect } from "react";
 import { Target, TrendingUp, AlertTriangle, Info, Zap } from "lucide-react";
 import { motion } from "framer-motion";
@@ -83,7 +84,7 @@ export function AIInsights() {
         },
         topSource && {
           type: "info" as const,
-          headline: `"${topSource.source}" is your top lead source — ${topSource.count} leads`,
+          headline: `"${getSourceConfig(topSource.source).label}" is your top lead source — ${topSource.count} leads`,
           detail: "Highest-volume acquisition channel. Increasing budget or response speed here delivers the highest return.",
         },
         total === 0 && {

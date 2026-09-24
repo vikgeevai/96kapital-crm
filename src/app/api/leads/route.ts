@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import sql, { initDb } from "@/lib/db";
 import { validateApiKey, authorizeDashboardRequest } from "@/lib/api-auth";
 import { corsHeaders } from "@/lib/cors";
+import { getSourceConfig } from "@/lib/sources";
 import { createRateLimiter, clientKey } from "@/lib/rate-limit";
 import { sendCustomerEmail, sendBusinessLeadEmail, LEAD_COPY_CONFIGURED } from "@/lib/email";
 
@@ -31,7 +32,11 @@ async function notifyAdminWhatsApp(data: {
     return;
   }
 
-  const sourceLabel = data.source ? ` [${data.source.replace(/-/g, " ")}]` : "";
+  // The display label, not the stored key. This printed the raw value, so
+  // every KAPVOY alert read "[fundwise]" — an internal database key shown to
+  // a person. getSourceConfig falls back to the key itself for a source that
+  // has no config, so an unknown source still reads as it always did.
+  const sourceLabel = data.source ? ` [${getSourceConfig(data.source).label}]` : "";
   const lines = [
     `🔔 *New CRM Lead${sourceLabel}*`,
     `👤 Name: ${data.name}`,

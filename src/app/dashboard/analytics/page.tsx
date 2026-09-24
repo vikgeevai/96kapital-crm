@@ -1,4 +1,5 @@
 "use client";
+import { getSourceConfig } from "@/lib/sources";
 import { useState, useEffect } from "react";
 import { PageShell } from "@/components/dashboard/PageShell";
 import {
@@ -119,7 +120,7 @@ export default function AnalyticsPage() {
     count: r.count,
   }));
 
-  const bySource = (stats?.bySource ?? []).map((r: any) => ({ name: r.source, count: r.count }));
+  const bySource = (stats?.bySource ?? []).map((r: any) => ({ name: getSourceConfig(r.source).label, count: r.count }));
 
   const pipeline = (stats?.revenuePipeline ?? []).map((r: any) => ({
     status: r.status.charAt(0).toUpperCase() + r.status.slice(1),
