@@ -121,8 +121,19 @@ const NO_STAFF_ALERT_SOURCES = new Set(["buddy-broker"]);
  * copy BCC'd onto it instead — see sendBusinessLeadEmail. Either way the
  * address receives one email per lead; the difference is only whether anyone
  * else is on it.
+ *
+ * 'indian-life-memorial' is here for a different reason than the others: not
+ * because a separate assistant wants its leads, but because it needs an email
+ * channel at all. It is in SELF_NOTIFYING_SOURCES, which suppresses this CRM's
+ * business email AND its WhatsApp, leaving its own site's WhatsApp as the only
+ * alert. On 2026-10-15 that single channel died silently — the Green API
+ * session dropped when the business re-registered WhatsApp — and no lead
+ * reached anyone, while the wizard still showed a success screen. Email runs on
+ * Resend and is independent of WhatsApp, so this entry restores a second,
+ * uncorrelated channel without re-introducing the duplicate WhatsApp alert that
+ * SELF_NOTIFYING_SOURCES exists to remove.
  */
-const LEAD_COPY_SOURCES = new Set(["kapvoy", "buddy-broker"]);
+const LEAD_COPY_SOURCES = new Set(["kapvoy", "buddy-broker", "indian-life-memorial"]);
 // ─────────────────────────────────────────────────────────────────────────
 
 
