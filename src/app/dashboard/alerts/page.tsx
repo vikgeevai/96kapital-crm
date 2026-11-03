@@ -176,7 +176,7 @@ export default function AlertsPage() {
               {visible.map(lead => {
                 const age = minutesAgo(lead.created_at);
                 const { color, bg, border, label: urgLabel } = urgencyColor(age);
-                const waUrl = `https://wa.me/${lead.phone.replace(/\D/g, "")}?text=${encodeURIComponent(`Hi ${lead.name}, thanks for your enquiry. We would love to help — are you available for a quick call?`)}`;
+                const waUrl = `https://wa.me/${(lead.phone ?? "").replace(/\D/g, "")}?text=${encodeURIComponent(`Hi ${lead.name}, thanks for your enquiry. We would love to help — are you available for a quick call?`)}`;
                 const hoursDisplay = age >= 60 ? `${Math.floor(age / 60)}h ${age % 60}m` : `${age}m`;
 
                 return (
@@ -208,13 +208,15 @@ export default function AlertsPage() {
                         </span>
                       </div>
                       <p className="text-xs truncate" style={{ color: "var(--text-muted)" }}>
-                        {lead.service || "Unknown service"} · {lead.phone}
+                        {lead.service || "Unknown service"} · {lead.phone || lead.email}
                         {lead.estimated_cost ? ` · ${lead.estimated_cost}` : ""}
                       </p>
                     </div>
 
                     {/* Actions */}
                     <div className="flex items-center gap-2 flex-shrink-0">
+                      {/* Email-only sources (kapvoy-guide) store an empty phone. */}
+                      {lead.phone && <>
                       <a href={waUrl} target="_blank" rel="noopener noreferrer"
                         className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white transition-colors"
                         style={{ background: "#16a34a" }}>
@@ -225,6 +227,7 @@ export default function AlertsPage() {
                         style={{ background: "var(--primary)" }}>
                         <Phone size={12} /> Call
                       </a>
+                      </>}
                       <button onClick={() => void markContacted(lead.id)}
                         disabled={markingId === lead.id}
                         className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-colors"

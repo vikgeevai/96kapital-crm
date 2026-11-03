@@ -294,7 +294,7 @@ export default function AIPage() {
           ) : (
             <div className="space-y-3">
               {scoredLeads.map(lead => {
-                const waUrl = `https://wa.me/${lead.phone.replace(/\D/g, "")}?text=${encodeURIComponent(`Hi ${lead.name}, thanks for your enquiry. We would love to help — are you available for a quick call?`)}`;
+                const waUrl = `https://wa.me/${(lead.phone ?? "").replace(/\D/g, "")}?text=${encodeURIComponent(`Hi ${lead.name}, thanks for your enquiry. We would love to help — are you available for a quick call?`)}`;
                 const scoreColor = lead.score >= 70 ? "#10b981" : lead.score >= 40 ? "#f59e0b" : "#3b82f6";
                 return (
                   <div key={lead.id} className="p-3 rounded-xl" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid var(--border)" }}>
@@ -317,11 +317,14 @@ export default function AIPage() {
                       {lead.estimated_cost && (
                         <span className="text-xs font-semibold" style={{ color: "#10b981" }}>{lead.estimated_cost}</span>
                       )}
+                      {/* Email-only sources (kapvoy-guide) store an empty phone. */}
+                      {lead.phone && (
                       <a href={waUrl} target="_blank" rel="noopener noreferrer"
                         className="inline-flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-lg text-white ml-auto"
                         style={{ background: "#16a34a" }}>
                         <MessageCircle size={11} /> WhatsApp
                       </a>
+                      )}
                     </div>
                   </div>
                 );

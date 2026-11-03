@@ -88,7 +88,7 @@ async function notifyAdminWhatsApp(data: {
  * Adding 'kapvoy' here would delete KAPVOY's only staff WhatsApp alert, and
  * notifyAdminWhatsApp swallows its own errors, so the loss would be silent.
  */
-const SELF_NOTIFYING_SOURCES = new Set(["indian-life-memorial"]);
+const SELF_NOTIFYING_SOURCES = new Set(["indian-life-memorial", "kapvoy-guide"]);
 
 /**
  * Sources this CRM sends NO staff alert for — no business email, no WhatsApp.
@@ -134,6 +134,32 @@ const NO_STAFF_ALERT_SOURCES = new Set(["buddy-broker"]);
  * SELF_NOTIFYING_SOURCES exists to remove.
  */
 const LEAD_COPY_SOURCES = new Set(["kapvoy", "buddy-broker", "indian-life-memorial"]);
+
+/**
+ * Sources whose leads arrive with an email address and no phone number.
+ *
+ * kapvoy-guide (kapvoy.sg/offer) collects only a name and an email: it is a
+ * PDF download, and asking for a phone number there would cost signups. For
+ * these the email is required instead of the phone, and the row stores an
+ * empty phone string rather than NULL, because several dashboard views call
+ * string methods on lead.phone.
+ *
+ * kapvoy-guide is also in SELF_NOTIFYING_SOURCES: the KAPVOY site sends its own
+ * signup alert whether or not this write succeeds, which is the condition that
+ * set requires.
+ */
+const EMAIL_ONLY_SOURCES = new Set(["kapvoy-guide"]);
+
+/**
+ * Sources whose own site emails the customer, so this CRM's generic "Your
+ * Enquiry Confirmation" email must not go out as well.
+ *
+ * kapvoy-guide's customer has already had two KAPVOY emails by the time the
+ * lead is written (the confirm link, then the kit). A third one in a
+ * different design, thanking them for an "enquiry" they never made, is
+ * exactly the kind of thing that gets an address marked as spam.
+ */
+const NO_CUSTOMER_EMAIL_SOURCES = new Set(["kapvoy-guide"]);
 // ─────────────────────────────────────────────────────────────────────────
 
 
@@ -201,8 +227,18 @@ export async function POST(req: NextRequest) {
     notes: notesField,
   } = body as Record<string, string> & { metadata?: Record<string, string> };
 
-  if (!name || !phone) {
-    return NextResponse.json({ error: "name and phone are required" }, { status: 422, headers });
+  // Normalised on the way IN, so the row is written with the current key even
+  // while a client is still sending the legacy one. That is what lets the
+  // KAPVOY site be updated after this rather than in lockstep with it.
+  // Done before validation, because which field is required depends on it.
+  const source = normaliseSource(sourceField) || "website";
+  const emailOnly = EMAIL_ONLY_SOURCES.has(source);
+
+  if (emailOnly ? !name || !email : !name || !phone) {
+    return NextResponse.json(
+      { error: emailOnly ? "name and email are required" : "name and phone are required" },
+      { status: 422, headers }
+    );
   }
 
   const service = serviceField || [arrangement_type, planning_type].filter(Boolean).join(" — ");
@@ -216,10 +252,6 @@ export async function POST(req: NextRequest) {
     death_cert_no && `Death cert: ${death_cert_no}`,
   ].filter(Boolean).join(" · ");
 
-  // Normalised on the way IN, so the row is written with the current key even
-  // while a client is still sending the legacy one. That is what lets the
-  // KAPVOY site be updated after this rather than in lockstep with it.
-  const source = normaliseSource(sourceField) || "website";
   const selfNotifies = SELF_NOTIFYING_SOURCES.has(source);
   // 'source' is normalised above, so a lead that arrived as 'fundwise'
   // matches here as 'kapvoy'. Both eras of the KAPVOY site behave the same.
@@ -243,7 +275,7 @@ export async function POST(req: NextRequest) {
         estimated_cost, deceased_name, death_cert_no,
         metadata
       ) VALUES (
-        ${name}, ${email ?? null}, ${phone}, ${address ?? null},
+        ${name}, ${email ?? null}, ${phone ?? ""}, ${address ?? null},
         ${service}, ${source}, 'new', ${notes},
         ${planning_type ?? null}, ${arrangement_type ?? null}, ${disposition_type ?? null},
         ${wake_duration ?? null}, ${location ?? null},
@@ -265,7 +297,7 @@ export async function POST(req: NextRequest) {
         .filter(Boolean).join(" · ") || undefined;
 
       const [custRes, bizRes] = await Promise.allSettled([
-        email ? sendCustomerEmail({
+        email && !NO_CUSTOMER_EMAIL_SOURCES.has(source) ? sendCustomerEmail({
           name, email: email ?? "",
           service,
           planDetails,

@@ -60,6 +60,20 @@ export const SOURCE_CONFIGS: Record<string, SourceConfig> = {
       { key: "business_structure", label: "Biz Structure"   },
     ],
   },
+  // kapvoy.sg/offer — people who confirmed their email to download the Cash
+  // Flow Funding Kit. Deliberately its own source, not 'kapvoy': they asked
+  // for a PDF, not for financing, and counting them as quiz leads would blur
+  // what a KAPVOY lead means. Email only, no phone (see EMAIL_ONLY_SOURCES).
+  "kapvoy-guide": {
+    label: "KAPVOY Guide",
+    color: "#0F6963",
+    metadataColumns: [
+      { key: "marketing_consent", label: "Follow-ups OK" },
+      { key: "consent_version",   label: "Consent Wording" },
+      { key: "confirmed_at",      label: "Confirmed" },
+      { key: "signup_page",       label: "Signup Page" },
+    ],
+  },
   "instagram-ads": {
     label: "Instagram Ads",
     color: "#E1306C",
